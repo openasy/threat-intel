@@ -1,0 +1,35 @@
+# Threat Intel. Jobs import STIX, CSV and text feeds; the other products look values up (ADR 0050).
+#
+#   openssl rand -hex 32 > openasy-kek   # threat-intel's key: sign-in secrets (ADR 0021). Keep it with your backups
+#   docker compose up -d
+#   docker compose logs threat-intel | grep 'no owner yet'   # the one-time link that creates the owner account
+services:
+  threat-intel:
+    image: ghcr.io/openasy/threat-intel:0.1.0
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: [/tmp]
+    ports:
+      - "127.0.0.1:8080:8080"   # UI and API; put a TLS proxy in front to reach it from elsewhere
+    volumes:
+      - threat-intel-data:/data   # SQLite database: feeds, indicators and the allow list
+    secrets:
+      - openasy-kek   # mounted at /run/secrets/openasy-kek
+    environment:
+      # The address people open Threat Intel at; with a TLS proxy in front, its https:// URL.
+      THREAT_INTEL_PUBLIC_URL: ${THREAT_INTEL_PUBLIC_URL:-http://localhost:8080}
+      # For feed jobs and products: it can import and look up, and nothing else. Or use an API token from Settings.
+      THREAT_INTEL_INGEST_TOKEN: ${THREAT_INTEL_INGEST_TOKEN:-}
+      # Sign in with your identity provider (OIDC), see the README:
+      # THREAT_INTEL_OIDC_ISSUER: https://login.example.com
+      # THREAT_INTEL_OIDC_CLIENT_ID: threat-intel
+      # THREAT_INTEL_OIDC_CLIENT_SECRET: ${THREAT_INTEL_OIDC_CLIENT_SECRET}
+
+volumes:
+  threat-intel-data:
+
+secrets:
+  openasy-kek:
+    file: ./openasy-kek

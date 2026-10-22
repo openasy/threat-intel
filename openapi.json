@@ -1,0 +1,2275 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "OpenAsy Threat Intel API",
+    "version": "0.1.0",
+    "summary": "Indicators from STIX, CSV and text feeds, one lookup for the other products, and an allow list with reasons.",
+    "description": "Every screen of threat-intel uses this API, and so can your scripts and the other OpenAsy products (ADR 0014). Within `/api/v1` changes are additive only; anything removed is deprecated first (ADR 0024). Errors use Problem Details (RFC 9457).\n\nFeeds import with `THREAT_INTEL_INGEST_TOKEN`, which may also look values up. Everything else takes the session of a signed-in person or an API token, and each operation names the role it needs (`x-openasy-role`: viewer, editor, admin; ADR 0003). TLP:RED indicators are only for editors, admins and the ingest token; for anyone else they do not exist.\n\nSign-in, members and API tokens are under `/api/v1/auth`, provided by [@openasy/auth](https://github.com/openasy/auth#routes).",
+    "license": {
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
+    }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "This threat-intel"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Lookup",
+      "description": "What the other products ask."
+    },
+    {
+      "name": "Feeds",
+      "description": "Where indicators come from."
+    },
+    {
+      "name": "Indicators",
+      "description": "What is known to be bad, for how long, and how sure."
+    },
+    {
+      "name": "Allow list",
+      "description": "What is known to be fine, with a reason and an end date."
+    },
+    {
+      "name": "Product",
+      "description": "Version and overview of this threat-intel."
+    }
+  ],
+  "paths": {
+    "/api/v1/feeds": {
+      "get": {
+        "operationId": "listFeeds",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "List feeds",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the viewer role.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The previous page's nextCursor.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feeds by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      },
+      "post": {
+        "operationId": "createFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Add a feed",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Where indicators come from. A feed's defaults fill in what its indicators do not say.\n\nNeeds the admin role.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewFeed"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "admin"
+      }
+    },
+    "/api/v1/feeds/{id}": {
+      "get": {
+        "operationId": "getFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Get a feed",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the viewer role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The feed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      },
+      "patch": {
+        "operationId": "updateFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Change a feed",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "New defaults apply to indicators stored from now on.\n\nNeeds the admin role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFeed"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The feed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feed"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "admin"
+      },
+      "delete": {
+        "operationId": "deleteFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Delete a feed",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the admin role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, with its indicators."
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "admin"
+      }
+    },
+    "/api/v1/feeds/{id}/import": {
+      "post": {
+        "operationId": "importFeed",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Import into a feed",
+        "security": [
+          {
+            "ingestToken": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Read by the feed's kind, optionally gzipped, up to 32 MiB and 200,000 indicators:\n\n- `stix`: a STIX 2.1 bundle. Indicators with patterns of `=`, `IN` and `ISSUBSET` on addresses, domains, URLs, email addresses and file hashes, joined by OR. Confidence, validity, TLP markings, labels and revocation are kept. Anything else is named in `unparsed` with its reason.\n- `csv`: a header row with `value` and optionally type, confidence, tlp, severity, tags, description, valid_from, valid_until, include_subdomains.\n- `text`: one value per line; `#` starts a comment.\n\nAn indicator the feed already has is replaced, so a feed can be sent again whole. Nothing is stored when the import itself cannot be read.\n\n```bash\ncurl -sf -X POST -H \"Authorization: Bearer $THREAT_INTEL_INGEST_TOKEN\" --data-binary @bundle.json \\\n  https://intel.example.com/api/v1/feeds/<id>/import\n```\n\nTakes THREAT_INTEL_INGEST_TOKEN, or an API token with the editor role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "A STIX 2.1 bundle, for a stix feed."
+              }
+            },
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was stored, and what was left out and why.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "413": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "editor"
+      }
+    },
+    "/api/v1/indicators": {
+      "get": {
+        "operationId": "listIndicators",
+        "tags": [
+          "Indicators"
+        ],
+        "summary": "List indicators",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the viewer role.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Only this type.",
+            "schema": {
+              "$ref": "#/components/schemas/IndicatorType"
+            }
+          },
+          {
+            "name": "feed",
+            "in": "query",
+            "required": false,
+            "description": "Only this feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Only values that contain this.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "tlp",
+            "in": "query",
+            "required": false,
+            "description": "Only this TLP.",
+            "schema": {
+              "$ref": "#/components/schemas/Tlp"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "description": "Only this severity.",
+            "schema": {
+              "$ref": "#/components/schemas/Severity"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "`inactive`: revoked, not yet valid or ended.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive",
+                "all"
+              ],
+              "default": "active"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The previous page's nextCursor.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Most recently changed first. TLP:RED is left out for viewers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      },
+      "post": {
+        "operationId": "createIndicator",
+        "tags": [
+          "Indicators"
+        ],
+        "summary": "Add an indicator",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Into a manual feed. Imports go to the other kinds.\n\nNeeds the editor role.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewIndicator"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored, or replaced when the feed had it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Indicator"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "editor"
+      }
+    },
+    "/api/v1/indicators/{id}": {
+      "get": {
+        "operationId": "getIndicator",
+        "tags": [
+          "Indicators"
+        ],
+        "summary": "Get an indicator",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "A TLP:RED indicator is not found for viewers.\n\nNeeds the viewer role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The indicator's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The indicator.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Indicator"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      },
+      "delete": {
+        "operationId": "deleteIndicator",
+        "tags": [
+          "Indicators"
+        ],
+        "summary": "Delete an indicator",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "A feed that sends it again stores it again; to keep a value from matching, put it on the allow list.\n\nNeeds the editor role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The indicator's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "editor"
+      }
+    },
+    "/api/v1/lookup": {
+      "get": {
+        "operationId": "lookupOne",
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Look up a value",
+        "security": [
+          {
+            "ingestToken": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "description": "For the other products: is this address, domain, URL, email address or hash known to be bad? An address also matches the blocks that hold it, and a domain the parents that include subdomains. Only active indicators count.\n\nTakes THREAT_INTEL_INGEST_TOKEN, or the session or API token of anyone with the viewer role. TLP:RED indicators count only for editors, admins and the ingest token.",
+        "parameters": [
+          {
+            "name": "value",
+            "in": "query",
+            "required": true,
+            "description": "Defanged values are read too.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Without it, the type the value looks like.",
+            "schema": {
+              "$ref": "#/components/schemas/IndicatorType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The verdict and what matched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      },
+      "post": {
+        "operationId": "lookupMany",
+        "tags": [
+          "Lookup"
+        ],
+        "summary": "Look up values",
+        "security": [
+          {
+            "ingestToken": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "description": "Up to 1000 values in one call. One wrong item refuses the call, naming it.\n\nTakes THREAT_INTEL_INGEST_TOKEN, or the session or API token of anyone with the viewer role. TLP:RED indicators count only for editors, admins and the ingest token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One result per item, in order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LookupResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      }
+    },
+    "/api/v1/allow-list": {
+      "get": {
+        "operationId": "listAllowList",
+        "tags": [
+          "Allow list"
+        ],
+        "summary": "List the allow list",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the viewer role.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The previous page's nextCursor.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Soonest to expire first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllowList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      },
+      "post": {
+        "operationId": "createAllowEntry",
+        "tags": [
+          "Allow list"
+        ],
+        "summary": "Allow a value",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "A value known to be fine is `allowed` in every lookup, whatever matches, until the entry expires. A block allows every address in it.\n\nNeeds the editor role.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewAllowEntry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllowEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "editor"
+      }
+    },
+    "/api/v1/allow-list/{id}": {
+      "delete": {
+        "operationId": "deleteAllowEntry",
+        "tags": [
+          "Allow list"
+        ],
+        "summary": "Remove from the allow list",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the editor role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The entry's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "editor"
+      }
+    },
+    "/api/v1/summary": {
+      "get": {
+        "operationId": "getSummary",
+        "tags": [
+          "Product"
+        ],
+        "summary": "Overview",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the viewer role.",
+        "responses": {
+          "200": {
+            "description": "Counts for the overview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "operationId": "getVersion",
+        "tags": [
+          "Product"
+        ],
+        "summary": "Version",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The running version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Version"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "operationId": "listProducts",
+        "tags": [
+          "Product"
+        ],
+        "summary": "Other products of this install",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Needs the viewer role.",
+        "responses": {
+          "200": {
+            "description": "From OPENASY_PRODUCTS, for the product switcher.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "liveness",
+        "tags": [
+          "Product"
+        ],
+        "summary": "Liveness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The process is running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readiness",
+        "tags": [
+          "Product"
+        ],
+        "summary": "Readiness",
+        "security": [],
+        "description": "Ready while the database answers.",
+        "responses": {
+          "200": {
+            "description": "Ready to serve.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "metrics",
+        "tags": [
+          "Product"
+        ],
+        "summary": "Prometheus metrics",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Metrics in the Prometheus text format.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-openasy-session",
+        "description": "The browser session after signing in (`openasy-session` when threat-intel runs on plain http://localhost). Requests that change something must come from the threat-intel origin."
+      },
+      "apiToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "An API token created under Settings → API tokens (`oa_threat-intel_...`): one role, always an expiry (ADR 0003)."
+      },
+      "adminToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Only when threat-intel is started by its tests or a local script: one shared token with the admin role. A production install does not have it."
+      },
+      "ingestToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "`THREAT_INTEL_INGEST_TOKEN`: for the jobs that import feeds and the products that look values up. It can do those two things, nothing else."
+      }
+    },
+    "responses": {
+      "Problem": {
+        "description": "An error, as RFC 9457 Problem Details.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "code"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid-token",
+              "invalid-json",
+              "invalid-body",
+              "invalid-import",
+              "conflict",
+              "not-found",
+              "not-configured",
+              "payload-too-large",
+              "internal-error",
+              "unauthenticated",
+              "invalid-credentials",
+              "mfa-required",
+              "mfa-setup-required",
+              "forbidden",
+              "cross-site",
+              "rate-limited"
+            ],
+            "description": "Stable; match on this."
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductLink": {
+        "type": "object",
+        "required": [
+          "id",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The product, as OpenAsy names it.",
+            "examples": [
+              "siem"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The address people open it at.",
+            "examples": [
+              "https://siem.example.com"
+            ]
+          }
+        }
+      },
+      "ProductList": {
+        "type": "object",
+        "required": [
+          "products"
+        ],
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductLink"
+            }
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "Version": {
+        "type": "object",
+        "required": [
+          "product",
+          "version"
+        ],
+        "properties": {
+          "product": {
+            "const": "threat-intel"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "IndicatorType": {
+        "type": "string",
+        "enum": [
+          "ipv4",
+          "ipv6",
+          "domain",
+          "url",
+          "sha256",
+          "sha1",
+          "md5",
+          "email",
+          "cidr"
+        ],
+        "description": "What the value is. `cidr` is a block of addresses; looking up an address finds the blocks that hold it."
+      },
+      "Tlp": {
+        "type": "string",
+        "enum": [
+          "clear",
+          "green",
+          "amber",
+          "red"
+        ],
+        "description": "Traffic Light Protocol 2.0. `red` is for named recipients: only editors, admins and the ingest token see it."
+      },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      "FeedKind": {
+        "type": "string",
+        "enum": [
+          "stix",
+          "csv",
+          "text",
+          "manual"
+        ],
+        "description": "How the feed takes indicators: a STIX 2.1 bundle, a CSV, a list of values one per line, or one at a time."
+      },
+      "Verdict": {
+        "type": "string",
+        "enum": [
+          "malicious",
+          "suspicious",
+          "unknown",
+          "allowed"
+        ],
+        "description": "`malicious` when an active indicator with confidence 60 or more matches, `suspicious` below that, `allowed` when the allow list has it, whatever matched."
+      },
+      "FeedRef": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Feed": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "defaultTtlDays",
+          "defaultConfidence",
+          "defaultTlp",
+          "defaultSeverity",
+          "lastImportAt",
+          "indicators",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FeedKind"
+          },
+          "defaultTtlDays": {
+            "type": "integer",
+            "description": "How long an indicator stays active when it does not say."
+          },
+          "defaultConfidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "defaultTlp": {
+            "$ref": "#/components/schemas/Tlp"
+          },
+          "defaultSeverity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "lastImportAt": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          },
+          "indicators": {
+            "type": "object",
+            "required": [
+              "total",
+              "active"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "active": {
+                "type": "integer"
+              }
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FeedList": {
+        "type": "object",
+        "required": [
+          "feeds"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "feeds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Feed"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "NewFeed": {
+        "type": "object",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._ -]{0,63}$"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FeedKind"
+          },
+          "defaultTtlDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650,
+            "default": 30
+          },
+          "defaultConfidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "default": 50
+          },
+          "defaultTlp": {
+            "$ref": "#/components/schemas/Tlp",
+            "default": "amber"
+          },
+          "defaultSeverity": {
+            "$ref": "#/components/schemas/Severity",
+            "default": "medium"
+          }
+        }
+      },
+      "UpdateFeed": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._ -]{0,63}$"
+          },
+          "defaultTtlDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "defaultConfidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "defaultTlp": {
+            "$ref": "#/components/schemas/Tlp"
+          },
+          "defaultSeverity": {
+            "$ref": "#/components/schemas/Severity"
+          }
+        },
+        "minProperties": 1,
+        "description": "The kind cannot change."
+      },
+      "ImportResult": {
+        "type": "object",
+        "required": [
+          "feed",
+          "received",
+          "created",
+          "updated",
+          "revoked",
+          "skippedCount",
+          "skipped",
+          "unparsedCount",
+          "unparsed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "feed": {
+            "$ref": "#/components/schemas/FeedRef"
+          },
+          "received": {
+            "type": "integer",
+            "description": "Indicators, rows or lines in the import."
+          },
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer",
+            "description": "Indicators the feed already had; their fields are replaced."
+          },
+          "revoked": {
+            "type": "integer",
+            "description": "STIX indicators marked revoked: kept, and never matched."
+          },
+          "skippedCount": {
+            "type": "integer",
+            "description": "Entries with a value or field that is wrong."
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "ref",
+                "reason"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "The line, row or STIX id."
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "maxItems": 100,
+            "description": "The first 100."
+          },
+          "unparsedCount": {
+            "type": "integer",
+            "description": "STIX patterns that ask for something an indicator list cannot hold, such as AND or other objects."
+          },
+          "unparsed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "pattern",
+                "reason"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              }
+            },
+            "maxItems": 100,
+            "description": "The first 100."
+          }
+        }
+      },
+      "Indicator": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "value",
+          "feed",
+          "confidence",
+          "tlp",
+          "severity",
+          "labels",
+          "description",
+          "includeSubdomains",
+          "validFrom",
+          "validUntil",
+          "revoked",
+          "active",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType"
+          },
+          "value": {
+            "type": "string",
+            "description": "In its stored form: refanged, lowercased, IPv6 compressed, host bits of a block cleared."
+          },
+          "feed": {
+            "$ref": "#/components/schemas/FeedRef"
+          },
+          "confidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "tlp": {
+            "$ref": "#/components/schemas/Tlp"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "includeSubdomains": {
+            "type": "boolean",
+            "description": "For a domain: its subdomains match too."
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Not revoked, and now is between validFrom and validUntil."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IndicatorList": {
+        "type": "object",
+        "required": [
+          "indicators"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "indicators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Indicator"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "NewIndicator": {
+        "type": "object",
+        "required": [
+          "feed",
+          "value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "feed": {
+            "type": "string",
+            "description": "The id or name of a manual feed."
+          },
+          "value": {
+            "type": "string",
+            "description": "Defanged values are read too: hxxp://bad[.]example."
+          },
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType",
+            "description": "Without it, the type the value looks like."
+          },
+          "confidence": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "tlp": {
+            "$ref": "#/components/schemas/Tlp"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "maxItems": 20
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "includeSubdomains": {
+            "type": "boolean"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Fields left out take the feed's defaults."
+      },
+      "Match": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "value",
+          "feed",
+          "confidence",
+          "severity",
+          "tlp",
+          "labels",
+          "description",
+          "validUntil",
+          "via"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType"
+          },
+          "value": {
+            "type": "string"
+          },
+          "feed": {
+            "$ref": "#/components/schemas/FeedRef"
+          },
+          "confidence": {
+            "type": "integer"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "tlp": {
+            "$ref": "#/components/schemas/Tlp"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "cidr",
+              "subdomain"
+            ],
+            "description": "How it matched: the value itself, a block that holds the address, or a parent domain that includes subdomains."
+          }
+        }
+      },
+      "LookupResult": {
+        "type": "object",
+        "required": [
+          "type",
+          "value",
+          "verdict",
+          "confidence",
+          "severity",
+          "tlp",
+          "feeds",
+          "matches",
+          "allowed"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType"
+          },
+          "value": {
+            "type": "string",
+            "description": "In its stored form."
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict"
+          },
+          "confidence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer",
+                "description": "The highest of the matches."
+              }
+            ]
+          },
+          "severity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Severity"
+              }
+            ]
+          },
+          "tlp": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Tlp"
+              }
+            ]
+          },
+          "feeds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Match"
+            },
+            "description": "Highest confidence first."
+          },
+          "allowed": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "reason",
+                  "expiresAt"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "LookupItem": {
+        "type": "object",
+        "required": [
+          "value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType",
+            "description": "Without it, the type the value looks like. Not cidr: look up an address."
+          }
+        }
+      },
+      "LookupRequest": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupItem"
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        }
+      },
+      "LookupResults": {
+        "type": "object",
+        "required": [
+          "results"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LookupResult"
+            },
+            "description": "In the order asked."
+          }
+        }
+      },
+      "AllowEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "value",
+          "includeSubdomains",
+          "reason",
+          "by",
+          "createdAt",
+          "expiresAt",
+          "active"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType"
+          },
+          "value": {
+            "type": "string"
+          },
+          "includeSubdomains": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "by": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "description": "Who added it."
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AllowList": {
+        "type": "object",
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllowEntry"
+            }
+          },
+          "nextCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "NewAllowEntry": {
+        "type": "object",
+        "required": [
+          "value",
+          "reason",
+          "expiresAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/IndicatorType"
+          },
+          "includeSubdomains": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500,
+            "description": "Required: a decision without a reason is lost the day its author leaves."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Within 366 days."
+          }
+        }
+      },
+      "Summary": {
+        "type": "object",
+        "required": [
+          "feeds",
+          "indicators",
+          "byType",
+          "allowListed",
+          "lookups"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "feeds": {
+            "type": "integer"
+          },
+          "indicators": {
+            "type": "object",
+            "required": [
+              "active",
+              "inactive"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "active": {
+                "type": "integer"
+              },
+              "inactive": {
+                "type": "integer"
+              }
+            }
+          },
+          "byType": {
+            "type": "object",
+            "required": [
+              "ipv4",
+              "ipv6",
+              "domain",
+              "url",
+              "sha256",
+              "sha1",
+              "md5",
+              "email",
+              "cidr"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "ipv4": {
+                "type": "integer"
+              },
+              "ipv6": {
+                "type": "integer"
+              },
+              "domain": {
+                "type": "integer"
+              },
+              "url": {
+                "type": "integer"
+              },
+              "sha256": {
+                "type": "integer"
+              },
+              "sha1": {
+                "type": "integer"
+              },
+              "md5": {
+                "type": "integer"
+              },
+              "email": {
+                "type": "integer"
+              },
+              "cidr": {
+                "type": "integer"
+              }
+            },
+            "description": "Active indicators."
+          },
+          "allowListed": {
+            "type": "integer",
+            "description": "Allow-list entries that have not expired."
+          },
+          "lookups": {
+            "type": "object",
+            "required": [
+              "total",
+              "hits"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "hits": {
+                "type": "integer",
+                "description": "Malicious or suspicious."
+              }
+            },
+            "description": "Since the process started."
+          }
+        }
+      }
+    }
+  }
+}
