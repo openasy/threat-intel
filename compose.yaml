@@ -23,9 +23,9 @@ services:
       # For feed jobs and products: it can import and look up, and nothing else. Or use an API token from Settings.
       THREAT_INTEL_INGEST_TOKEN: ${THREAT_INTEL_INGEST_TOKEN:-}
       # Sign in with your identity provider (OIDC), see the README:
-      # THREAT_INTEL_OIDC_ISSUER: https://login.example.com
-      # THREAT_INTEL_OIDC_CLIENT_ID: threat-intel
-      # THREAT_INTEL_OIDC_CLIENT_SECRET: ${THREAT_INTEL_OIDC_CLIENT_SECRET}
+      # OPENASY_OIDC_ISSUER: https://login.example.com
+      # OPENASY_OIDC_CLIENT_ID: threat-intel
+      # OPENASY_OIDC_CLIENT_SECRET: ${OPENASY_OIDC_CLIENT_SECRET}
 
 volumes:
   threat-intel-data:

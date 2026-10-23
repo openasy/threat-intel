@@ -87,7 +87,7 @@ are on http://localhost:8080, the API reference at http://localhost:8080/api/doc
 | `THREAT_INTEL_RETENTION_DAYS` | `365` | Indicators that ended, and allow-list entries that expired, this long ago are deleted |
 | `THREAT_INTEL_METRICS_PORT` | | Serve `/metrics` on this port only (ADR 0026) |
 | `THREAT_INTEL_HEADLESS` | `false` | `true` serves only the API |
-| `THREAT_INTEL_PASSWORD_SIGN_IN`, `THREAT_INTEL_OIDC_*` | | Sign-in, as in every OpenAsy product ([@openasy/auth](https://github.com/openasy/auth)) |
+| `THREAT_INTEL_PASSWORD_SIGN_IN`, `OPENASY_OIDC_*` | | Sign-in, as in every OpenAsy product ([@openasy/auth](https://github.com/openasy/auth)) |
 
 `/metrics` has `openasy_threat_intel_indicators{type}`, `openasy_threat_intel_feeds`, `openasy_threat_intel_allow_list`,
 `openasy_threat_intel_lookups_total` and `openasy_threat_intel_lookup_hits_total`.
