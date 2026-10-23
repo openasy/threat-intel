@@ -46,7 +46,9 @@ async function call(method: string, path: string, init: RequestInit = {}, concre
   // A response is either inline or a $ref to components/responses; build the JSON pointer to its schema either way.
   const shared = declared!.$ref?.split("/").pop();
   const response = shared ? spec.components.responses[shared]! : declared!;
-  const at = shared ? `openapi#/components/responses/${shared}` : `openapi#/paths/${path.replaceAll("/", "~1")}/${method.toLowerCase()}/responses/${res.status}`;
+  const at = shared
+    ? `openapi#/components/responses/${shared}`
+    : `openapi#/paths/${path.replaceAll("/", "~1")}/${method.toLowerCase()}/responses/${res.status}`;
 
   if (!response.content) {
     expect(res.headers.get("content-length") ?? "0", `${method} ${path} ${res.status} should have no body`).toBe("0");
@@ -62,7 +64,10 @@ async function call(method: string, path: string, init: RequestInit = {}, concre
   return { res, body };
 }
 
-const auth = (token: string, body?: string | Buffer, type = "application/json", extra: Record<string, string> = {}) => ({ headers: { authorization: `Bearer ${token}`, "content-type": type, ...extra }, ...(body !== undefined && { body }) });
+const auth = (token: string, body?: string | Buffer, type = "application/json", extra: Record<string, string> = {}) => ({
+  headers: { authorization: `Bearer ${token}`, "content-type": type, ...extra },
+  ...(body !== undefined && { body }),
+});
 const admin = (body?: unknown) => auth(ADMIN_TOKEN, body === undefined ? undefined : typeof body === "string" ? body : JSON.stringify(body));
 const idOf = (r: { body: unknown }) => (r.body as { id: string }).id;
 const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
@@ -123,8 +128,17 @@ describe("responses match openapi.json", () => {
   });
 
   it("imports, and every refusal", async () => {
-    const body = bundle({ pattern: "[ipv4-addr:value = '198.51.100.40']", confidence: 90 }, { pattern: "[network-traffic:dst_port = 443]" }, { pattern: "[domain-name:value = 'c2.example.org']", tlp: "red" });
-    await call("POST", "/api/v1/feeds/{id}/import", auth(INGEST_TOKEN, gzipSync(body), "application/json", { "content-encoding": "gzip" }), `/api/v1/feeds/${stix}/import`);
+    const body = bundle(
+      { pattern: "[ipv4-addr:value = '198.51.100.40']", confidence: 90 },
+      { pattern: "[network-traffic:dst_port = 443]" },
+      { pattern: "[domain-name:value = 'c2.example.org']", tlp: "red" },
+    );
+    await call(
+      "POST",
+      "/api/v1/feeds/{id}/import",
+      auth(INGEST_TOKEN, gzipSync(body), "application/json", { "content-encoding": "gzip" }),
+      `/api/v1/feeds/${stix}/import`,
+    );
     await call("POST", "/api/v1/feeds/{id}/import", auth(INGEST_TOKEN, "not json"), `/api/v1/feeds/${stix}/import`);
     await call("POST", "/api/v1/feeds/{id}/import", auth(INGEST_TOKEN, body), `/api/v1/feeds/${manual}/import`);
     await call("POST", "/api/v1/feeds/{id}/import", auth(INGEST_TOKEN, body), "/api/v1/feeds/missing/import");
@@ -132,7 +146,9 @@ describe("responses match openapi.json", () => {
   });
 
   it("indicators", async () => {
-    indicator = idOf(await call("POST", "/api/v1/indicators", admin({ feed: manual, value: "hxxps://phish[.]example.net/login", severity: "high", labels: ["phishing"] })));
+    indicator = idOf(
+      await call("POST", "/api/v1/indicators", admin({ feed: manual, value: "hxxps://phish[.]example.net/login", severity: "high", labels: ["phishing"] })),
+    );
     await call("POST", "/api/v1/indicators", admin({ feed: manual, value: "1.2.3.4", type: "domain" }));
     await call("POST", "/api/v1/indicators", admin({ feed: stix, value: "198.51.100.41" }));
     await call("POST", "/api/v1/indicators", admin({ feed: "missing", value: "198.51.100.41" }));
@@ -151,7 +167,11 @@ describe("responses match openapi.json", () => {
     await call("GET", "/api/v1/lookup", admin(), "/api/v1/lookup");
     await call("GET", "/api/v1/lookup", admin(), "/api/v1/lookup?value=what");
     await call("GET", "/api/v1/lookup", {}, "/api/v1/lookup?value=198.51.100.40");
-    await call("POST", "/api/v1/lookup", auth(INGEST_TOKEN, JSON.stringify({ items: [{ value: "198.51.100.40" }, { value: "https://phish.example.net/login", type: "url" }] })));
+    await call(
+      "POST",
+      "/api/v1/lookup",
+      auth(INGEST_TOKEN, JSON.stringify({ items: [{ value: "198.51.100.40" }, { value: "https://phish.example.net/login", type: "url" }] })),
+    );
     await call("POST", "/api/v1/lookup", admin({ items: [] }));
     await call("POST", "/api/v1/lookup", admin({ items: [{ value: "198.51.100.0/24", type: "cidr" }] }));
     await call("POST", "/api/v1/lookup", admin("{"));

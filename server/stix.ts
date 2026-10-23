@@ -16,9 +16,9 @@ function tokenize(pattern: string): Tok[] {
       for (;;) {
         if (i >= pattern.length) throw new StixPatternError("a string is not closed");
         const d = pattern[i]!;
-        if (d === "\\" && i + 1 < pattern.length) (s += pattern[i + 1], (i += 2));
+        if (d === "\\" && i + 1 < pattern.length) ((s += pattern[i + 1]), (i += 2));
         else if (d === c) break;
-        else (s += d, i++);
+        else ((s += d), i++);
       }
       i++;
       out.push({ t: "str", v: s });

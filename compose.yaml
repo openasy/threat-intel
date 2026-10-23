@@ -12,11 +12,11 @@ services:
     security_opt: ["no-new-privileges:true"]
     tmpfs: [/tmp]
     ports:
-      - "127.0.0.1:8080:8080"   # UI and API; put a TLS proxy in front to reach it from elsewhere
+      - "127.0.0.1:8080:8080" # UI and API; put a TLS proxy in front to reach it from elsewhere
     volumes:
-      - threat-intel-data:/data   # SQLite database: feeds, indicators and the allow list
+      - threat-intel-data:/data # SQLite database: feeds, indicators and the allow list
     secrets:
-      - openasy-kek   # mounted at /run/secrets/openasy-kek
+      - openasy-kek # mounted at /run/secrets/openasy-kek
     environment:
       # The address people open Threat Intel at; with a TLS proxy in front, its https:// URL.
       THREAT_INTEL_PUBLIC_URL: ${THREAT_INTEL_PUBLIC_URL:-http://localhost:8080}

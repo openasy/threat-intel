@@ -27,7 +27,23 @@ import {
 import { AccountSettings, AuthGate, MembersSettings, SignInSettings, TokensSettings, useAuth } from "@openasy/auth/react";
 import { KeyRound, ListChecks, LogIn, LogOut, Plus, Rss, Search, Settings2, ShieldCheck, Trash2, Upload, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { api, INDICATOR_TYPES, MfaSetupRequired, Unauthorized, type AllowEntry, type Feed, type FeedKind, type Indicator, type IndicatorType, type LookupResult, type ProductLink, type Severity, type Summary, type Tlp, type Verdict } from "./api.ts";
+import {
+  api,
+  INDICATOR_TYPES,
+  MfaSetupRequired,
+  Unauthorized,
+  type AllowEntry,
+  type Feed,
+  type FeedKind,
+  type Indicator,
+  type IndicatorType,
+  type LookupResult,
+  type ProductLink,
+  type Severity,
+  type Summary,
+  type Tlp,
+  type Verdict,
+} from "./api.ts";
 import { useT, type T } from "./i18n.ts";
 
 const PAGES = ["indicators", "feeds", "allow-list", "setup", "account", "members", "signin", "tokens"] as const;
@@ -60,11 +76,31 @@ type Call = ReturnType<typeof useApi>;
 const date = (iso: string) => new Date(iso).toLocaleDateString();
 const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
 
-const TYPE_LABEL: Record<IndicatorType, string> = { ipv4: "IPv4", ipv6: "IPv6", cidr: "Block", domain: "Domain", url: "URL", email: "Email", sha256: "SHA-256", sha1: "SHA-1", md5: "MD5" };
+const TYPE_LABEL: Record<IndicatorType, string> = {
+  ipv4: "IPv4",
+  ipv6: "IPv6",
+  cidr: "Block",
+  domain: "Domain",
+  url: "URL",
+  email: "Email",
+  sha256: "SHA-256",
+  sha1: "SHA-1",
+  md5: "MD5",
+};
 const TLP_TONE: Record<Tlp, "neutral" | "success" | "warning" | "danger"> = { clear: "neutral", green: "success", amber: "warning", red: "danger" };
 const SEVERITY_TONE: Record<Severity, "critical" | "danger" | "warning" | "info"> = { critical: "critical", high: "danger", medium: "warning", low: "info" };
-const VERDICT_TONE: Record<Verdict, "danger" | "warning" | "neutral" | "success"> = { malicious: "danger", suspicious: "warning", unknown: "neutral", allowed: "success" };
-const VERDICT_LABEL = (t: T): Record<Verdict, string> => ({ malicious: "Malicious", suspicious: "Suspicious", unknown: t("verdictLabel.notKnown"), allowed: "Allowed" });
+const VERDICT_TONE: Record<Verdict, "danger" | "warning" | "neutral" | "success"> = {
+  malicious: "danger",
+  suspicious: "warning",
+  unknown: "neutral",
+  allowed: "success",
+};
+const VERDICT_LABEL = (t: T): Record<Verdict, string> => ({
+  malicious: "Malicious",
+  suspicious: "Suspicious",
+  unknown: t("verdictLabel.notKnown"),
+  allowed: "Allowed",
+});
 const KIND_LABEL = (t: T): Record<FeedKind, string> => ({ stix: "STIX 2.1", csv: "CSV", text: t("kindLabel.textList"), manual: "Manual" });
 
 const TlpBadge = ({ tlp }: { tlp: Tlp }) => {
@@ -77,18 +113,18 @@ function Code({ children }: { children: ReactNode }) {
   return <pre className="m-0 overflow-x-auto rounded-md bg-subtle px-2.5 py-2 font-mono text-xs text-fg">{children}</pre>;
 }
 
-const TLPS = (t: T): Array<{ value: Tlp; label: string }> => ([
+const TLPS = (t: T): Array<{ value: Tlp; label: string }> => [
   { value: "clear", label: t("tlps.tlpClear") },
   { value: "green", label: t("tlps.tlpGreen") },
   { value: "amber", label: t("tlps.tlpAmber") },
   { value: "red", label: t("tlps.tlpRedEditorsAndAdmins") },
-]);
-const SEVERITIES = (t: T): Array<{ value: Severity; label: string }> => ([
+];
+const SEVERITIES = (t: T): Array<{ value: Severity; label: string }> => [
   { value: "critical", label: t("severities.critical") },
   { value: "high", label: t("severities.high") },
   { value: "medium", label: t("severities.medium") },
   { value: "low", label: t("severities.low") },
-]);
+];
 
 // ---------------------------------------------------------------- Lookup
 
@@ -125,7 +161,11 @@ function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
   type Match = LookupResult["matches"][number];
   const columns: Column<Match>[] = [
     { id: "value", header: t("lookupPage.indicator"), width: "36%", cell: (m) => <span className="threat-intel-wrap font-mono text-xs">{m.value}</span> },
-    { id: "via", header: t("lookupPage.matched"), cell: (m) => <Badge>{m.via === "exact" ? t("lookupPage.theValue") : m.via === "cidr" ? t("lookupPage.aBlock") : t("lookupPage.aParentDomain")}</Badge> },
+    {
+      id: "via",
+      header: t("lookupPage.matched"),
+      cell: (m) => <Badge>{m.via === "exact" ? t("lookupPage.theValue") : m.via === "cidr" ? t("lookupPage.aBlock") : t("lookupPage.aParentDomain")}</Badge>,
+    },
     { id: "feed", header: t("lookupPage.feed"), cell: (m) => m.feed.name },
     { id: "confidence", header: t("lookupPage.confidence"), align: "right", cell: (m) => m.confidence },
     { id: "severity", header: t("lookupPage.severity"), cell: (m) => <SeverityBadge severity={m.severity} /> },
@@ -134,18 +174,32 @@ function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
   ];
   return (
     <>
-      <PageHeader title={t("lookupPage.lookUp")} description="Is an address, domain, URL, email address or file hash known to be bad? Defanged values such as hxxp://bad[.]example are read too." />
+      <PageHeader
+        title={t("lookupPage.lookUp")}
+        description="Is an address, domain, URL, email address or file hash known to be bad? Defanged values such as hxxp://bad[.]example are read too."
+      />
       {summary && (
         <KpiGrid minWidth={150}>
           <KpiCard label={t("lookupPage.activeIndicators")} value={summary.indicators.active.toLocaleString()} href="/indicators" />
           <KpiCard label={t("lookupPage.feeds")} value={summary.feeds} href="/feeds" />
           <KpiCard label={t("lookupPage.allowedValues")} value={summary.allowListed} href="/allow-list" />
-          <KpiCard label={t("lookupPage.lookups")} value={summary.lookups.total.toLocaleString()} footer={t("lookupPage.matchedSinceTheLastStart", { value: summary.lookups.hits.toLocaleString() })} />
+          <KpiCard
+            label={t("lookupPage.lookups")}
+            value={summary.lookups.total.toLocaleString()}
+            footer={t("lookupPage.matchedSinceTheLastStart", { value: summary.lookups.hits.toLocaleString() })}
+          />
         </KpiGrid>
       )}
       <Panel>
         <form className="threat-intel-lookup flex flex-wrap items-end gap-2" onSubmit={submit}>
-          <TextField label={t("lookupPage.value")} value={value} onChange={(e) => setValue(e.target.value)} placeholder={t("lookupPage.n198511007Bad")} mono error={error} />
+          <TextField
+            label={t("lookupPage.value")}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={t("lookupPage.n198511007Bad")}
+            mono
+            error={error}
+          />
           <Button type="submit" variant="primary" icon={<Search />} disabled={!value.trim()}>
             {t("lookupPage.lookUp")}
           </Button>
@@ -205,7 +259,12 @@ function IndicatorDialog({ call, feeds, onClose, onSaved }: { call: Call; feeds:
           ...(severity && { severity }),
           ...(tlp && { tlp }),
           ...(days && { validUntil: inDays(Number(days)) }),
-          ...(labels.trim() && { labels: labels.split(",").map((l) => l.trim()).filter(Boolean) }),
+          ...(labels.trim() && {
+            labels: labels
+              .split(",")
+              .map((l) => l.trim())
+              .filter(Boolean),
+          }),
           ...(description.trim() && { description }),
           ...(subdomains && { includeSubdomains: true }),
         }),
@@ -235,24 +294,63 @@ function IndicatorDialog({ call, feeds, onClose, onSaved }: { call: Call; feeds:
     >
       {!manual.length ? (
         <Callout tone="info" title={msg("indicatorDialog.noManualFeed")}>
-          {msg("indicatorDialog.anAdminAddsAFeed")}{" "}<a href="/feeds">{msg("indicatorDialog.feeds")}</a> first.
+          {msg("indicatorDialog.anAdminAddsAFeed")} <a href="/feeds">{msg("indicatorDialog.feeds")}</a> first.
         </Callout>
       ) : (
         <>
           <div className="grid gap-2 sm:grid-cols-2">
-            <SelectField label={msg("indicatorDialog.feed")} value={feed} onChange={(e) => setFeed(e.target.value)} options={manual.map((f) => ({ value: f.id, label: f.name }))} />
-            <SelectField label={msg("indicatorDialog.type")} value={type} onChange={(e) => setType(e.target.value)} options={[{ value: "", label: msg("indicatorDialog.asItLooks") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] }))]} />
+            <SelectField
+              label={msg("indicatorDialog.feed")}
+              value={feed}
+              onChange={(e) => setFeed(e.target.value)}
+              options={manual.map((f) => ({ value: f.id, label: f.name }))}
+            />
+            <SelectField
+              label={msg("indicatorDialog.type")}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              options={[{ value: "", label: msg("indicatorDialog.asItLooks") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] }))]}
+            />
           </div>
-          <TextField label={msg("indicatorDialog.value")} value={value} onChange={(e) => setValue(e.target.value)} mono hint="Defanged is fine: hxxp://bad[.]example." />
+          <TextField
+            label={msg("indicatorDialog.value")}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            mono
+            hint="Defanged is fine: hxxp://bad[.]example."
+          />
           <div className="grid gap-2 sm:grid-cols-2">
-            <TextField label={msg("indicatorDialog.confidence0To100")} inputMode="numeric" value={confidence} onChange={(e) => setConfidence(e.target.value)} hint={msg("indicatorDialog.maliciousFrom60")} />
+            <TextField
+              label={msg("indicatorDialog.confidence0To100")}
+              inputMode="numeric"
+              value={confidence}
+              onChange={(e) => setConfidence(e.target.value)}
+              hint={msg("indicatorDialog.maliciousFrom60")}
+            />
             <TextField label={msg("indicatorDialog.activeForDays")} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />
-            <SelectField label={msg("indicatorDialog.severity")} value={severity} onChange={(e) => setSeverity(e.target.value)} options={[{ value: "", label: msg("indicatorDialog.theFeedSDefault") }, ...SEVERITIES(msg)]} />
-            <SelectField label="TLP" value={tlp} onChange={(e) => setTlp(e.target.value)} options={[{ value: "", label: msg("indicatorDialog.theFeedSDefault") }, ...TLPS(msg)]} />
+            <SelectField
+              label={msg("indicatorDialog.severity")}
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value)}
+              options={[{ value: "", label: msg("indicatorDialog.theFeedSDefault") }, ...SEVERITIES(msg)]}
+            />
+            <SelectField
+              label="TLP"
+              value={tlp}
+              onChange={(e) => setTlp(e.target.value)}
+              options={[{ value: "", label: msg("indicatorDialog.theFeedSDefault") }, ...TLPS(msg)]}
+            />
           </div>
-          <TextField label={msg("indicatorDialog.labels")} value={labels} onChange={(e) => setLabels(e.target.value)} hint={msg("indicatorDialog.commaSeparatedSuchAsPhishing")} />
+          <TextField
+            label={msg("indicatorDialog.labels")}
+            value={labels}
+            onChange={(e) => setLabels(e.target.value)}
+            hint={msg("indicatorDialog.commaSeparatedSuchAsPhishing")}
+          />
           <TextField label={msg("indicatorDialog.description")} value={description} onChange={(e) => setDescription(e.target.value)} error={error} />
-          {(type === "domain" || (!type && /^[^/:@]+\.[a-z]{2,}$/i.test(value.trim()))) && <Switch checked={subdomains} onCheckedChange={setSubdomains} label={msg("indicatorDialog.subdomainsMatchToo")} />}
+          {(type === "domain" || (!type && /^[^/:@]+\.[a-z]{2,}$/i.test(value.trim()))) && (
+            <Switch checked={subdomains} onCheckedChange={setSubdomains} label={msg("indicatorDialog.subdomainsMatchToo")} />
+          )}
         </>
       )}
     </Dialog>
@@ -272,7 +370,14 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Indicator>();
 
-  useEffect(() => void call<{ feeds: Feed[] }>("/api/v1/feeds?limit=500").then((r) => setFeeds(r.feeds), () => {}), [call]);
+  useEffect(
+    () =>
+      void call<{ feeds: Feed[] }>("/api/v1/feeds?limit=500").then(
+        (r) => setFeeds(r.feeds),
+        () => {},
+      ),
+    [call],
+  );
   const query = new URLSearchParams({ status, limit: "200", ...(type && { type }), ...(feed && { feed }), ...(q.trim() && { q: q.trim() }) }).toString();
   const load = useCallback(() => {
     setRows(undefined);
@@ -282,7 +387,11 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
     );
   }, [call, query]);
   useEffect(load, [load]);
-  const more = () => next && void call<{ indicators: Indicator[]; nextCursor?: string }>(`/api/v1/indicators?${query}&cursor=${next}`).then((r) => (setRows((rs) => [...(rs ?? []), ...r.indicators]), setNext(r.nextCursor)));
+  const more = () =>
+    next &&
+    void call<{ indicators: Indicator[]; nextCursor?: string }>(`/api/v1/indicators?${query}&cursor=${next}`).then(
+      (r) => (setRows((rs) => [...(rs ?? []), ...r.indicators]), setNext(r.nextCursor)),
+    );
 
   const columns: Column<Indicator>[] = [
     { id: "type", header: msg("indicatorsPage.type"), width: "90px", cell: (i) => <Badge>{TYPE_LABEL[i.type]}</Badge> },
@@ -296,7 +405,11 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
             {i.value}
             {i.includeSubdomains ? msg("indicatorsPage.andSubdomains") : ""}
           </a>
-          {(i.labels.length > 0 || i.description) && <span className="threat-intel-clamp text-xs text-fg-muted" title={i.description ?? undefined}>{[i.labels.join(", "), i.description].filter(Boolean).join(" · ")}</span>}
+          {(i.labels.length > 0 || i.description) && (
+            <span className="threat-intel-clamp text-xs text-fg-muted" title={i.description ?? undefined}>
+              {[i.labels.join(", "), i.description].filter(Boolean).join(" · ")}
+            </span>
+          )}
         </span>
       ),
     },
@@ -304,8 +417,25 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
     { id: "confidence", header: msg("indicatorsPage.confidence"), align: "right", sortValue: (i) => i.confidence, cell: (i) => i.confidence },
     { id: "severity", header: msg("indicatorsPage.severity"), cell: (i) => <SeverityBadge severity={i.severity} /> },
     { id: "tlp", header: "TLP", cell: (i) => <TlpBadge tlp={i.tlp} /> },
-    { id: "until", header: msg("indicatorsPage.until"), sortValue: (i) => i.validUntil, cell: (i) => <span className="whitespace-nowrap text-xs">{i.revoked ? msg("indicatorsPage.revoked") : date(i.validUntil)}</span> },
-    ...(can("editor") ? [{ id: "remove", header: "", align: "right" as const, width: "56px", cell: (i: Indicator) => <Button size="sm" icon={<Trash2 />} aria-label={msg("indicatorsPage.delete", { value: i.value })} onClick={() => setRemoving(i)} /> }] : []),
+    {
+      id: "until",
+      header: msg("indicatorsPage.until"),
+      sortValue: (i) => i.validUntil,
+      cell: (i) => <span className="whitespace-nowrap text-xs">{i.revoked ? msg("indicatorsPage.revoked") : date(i.validUntil)}</span>,
+    },
+    ...(can("editor")
+      ? [
+          {
+            id: "remove",
+            header: "",
+            align: "right" as const,
+            width: "56px",
+            cell: (i: Indicator) => (
+              <Button size="sm" icon={<Trash2 />} aria-label={msg("indicatorsPage.delete", { value: i.value })} onClick={() => setRemoving(i)} />
+            ),
+          },
+        ]
+      : []),
   ];
   return (
     <>
@@ -331,12 +461,35 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
             { value: "all", label: msg("indicatorsPage.all") },
           ]}
         />
-        <SelectField label={msg("indicatorsPage.type")} value={type} onChange={(e) => setType(e.target.value)} options={[{ value: "", label: msg("indicatorsPage.anyType") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] }))]} />
-        <SelectField label={msg("indicatorsPage.feed")} value={feed} onChange={(e) => setFeed(e.target.value)} options={[{ value: "", label: msg("indicatorsPage.anyFeed") }, ...feeds.map((f) => ({ value: f.id, label: f.name }))]} />
+        <SelectField
+          label={msg("indicatorsPage.type")}
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+          options={[{ value: "", label: msg("indicatorsPage.anyType") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] }))]}
+        />
+        <SelectField
+          label={msg("indicatorsPage.feed")}
+          value={feed}
+          onChange={(e) => setFeed(e.target.value)}
+          options={[{ value: "", label: msg("indicatorsPage.anyFeed") }, ...feeds.map((f) => ({ value: f.id, label: f.name }))]}
+        />
         <TextField label={msg("indicatorsPage.contains")} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <Panel flush>
-        <DataTable label={msg("indicatorsPage.indicators")} columns={columns} rows={rows ?? []} loading={!rows} getRowId={(i) => i.id} minWidth={980} pageSize={50} empty={<EmptyState title={msg("indicatorsPage.noIndicators")}>{status === "active" ? msg("indicatorsPage.importAFeedOrAdd") : msg("indicatorsPage.noneMatch")}</EmptyState>} />
+        <DataTable
+          label={msg("indicatorsPage.indicators")}
+          columns={columns}
+          rows={rows ?? []}
+          loading={!rows}
+          getRowId={(i) => i.id}
+          minWidth={980}
+          pageSize={50}
+          empty={
+            <EmptyState title={msg("indicatorsPage.noIndicators")}>
+              {status === "active" ? msg("indicatorsPage.importAFeedOrAdd") : msg("indicatorsPage.noneMatch")}
+            </EmptyState>
+          }
+        />
       </Panel>
       {next && (
         <div>
@@ -366,7 +519,11 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
               <Button type="button" onClick={() => setRemoving(undefined)}>
                 {msg("indicatorsPage.cancel")}
               </Button>
-              <Button type="button" variant="primary" onClick={() => void call(`/api/v1/indicators/${removing.id}`, { method: "DELETE" }).then(() => (setRemoving(undefined), load(), reload()))}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void call(`/api/v1/indicators/${removing.id}`, { method: "DELETE" }).then(() => (setRemoving(undefined), load(), reload()))}
+              >
                 {msg("indicatorsPage.delete3")}
               </Button>
             </>
@@ -435,7 +592,13 @@ function FeedDialog({ call, feed, onClose, onSaved }: { call: Call; feed?: Feed;
       )}
       <div className="grid gap-2 sm:grid-cols-2">
         <TextField label={t("feedDialog.activeForDays")} inputMode="numeric" value={ttl} onChange={(e) => setTtl(e.target.value)} />
-        <TextField label={t("feedDialog.confidence0To100")} inputMode="numeric" value={confidence} onChange={(e) => setConfidence(e.target.value)} hint={t("feedDialog.maliciousFrom60")} />
+        <TextField
+          label={t("feedDialog.confidence0To100")}
+          inputMode="numeric"
+          value={confidence}
+          onChange={(e) => setConfidence(e.target.value)}
+          hint={t("feedDialog.maliciousFrom60")}
+        />
         <SelectField label={t("feedDialog.severity")} value={severity} onChange={(e) => setSeverity(e.target.value as Severity)} options={SEVERITIES(t)} />
         <SelectField label="TLP" value={tlp} onChange={(e) => setTlp(e.target.value as Tlp)} options={TLPS(t)} />
       </div>
@@ -444,7 +607,16 @@ function FeedDialog({ call, feed, onClose, onSaved }: { call: Call; feed?: Feed;
   );
 }
 
-type ImportResult = { received: number; created: number; updated: number; revoked: number; skippedCount: number; skipped: Array<{ ref: string; reason: string }>; unparsedCount: number; unparsed: Array<{ id: string; pattern: string; reason: string }> };
+type ImportResult = {
+  received: number;
+  created: number;
+  updated: number;
+  revoked: number;
+  skippedCount: number;
+  skipped: Array<{ ref: string; reason: string }>;
+  unparsedCount: number;
+  unparsed: Array<{ id: string; pattern: string; reason: string }>;
+};
 
 function ImportDialog({ call, feed, onClose, onDone }: { call: Call; feed: Feed; onClose: () => void; onDone: () => void }) {
   const t = useT();
@@ -491,13 +663,18 @@ function ImportDialog({ call, feed, onClose, onDone }: { call: Call; feed: Feed;
       {!result ? (
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium">{t("importDialog.file")}</span>
-          <input type="file" accept={feed.kind === "stix" ? ".json,application/json" : feed.kind === "csv" ? ".csv,text/csv" : ".txt,text/plain"} onChange={(e) => setFile(e.target.files?.[0])} />
+          <input
+            type="file"
+            accept={feed.kind === "stix" ? ".json,application/json" : feed.kind === "csv" ? ".csv,text/csv" : ".txt,text/plain"}
+            onChange={(e) => setFile(e.target.files?.[0])}
+          />
           {error && <span className="text-xs text-danger">{error}</span>}
         </label>
       ) : (
         <>
           <p className="m-0 text-sm">
-            {t("plurals.entry", { count: result.received })} read: {result.created} new, {result.updated} replaced{result.revoked ? t("importDialog.revoked", { revoked: result.revoked }) : ""}.
+            {t("plurals.entry", { count: result.received })} read: {result.created} new, {result.updated} replaced
+            {result.revoked ? t("importDialog.revoked", { revoked: result.revoked }) : ""}.
           </p>
           {problems.length > 0 && (
             <Callout tone="warning" title={t("importDialog.leftOut", { value: result.skippedCount + result.unparsedCount })}>
@@ -525,7 +702,14 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
   const [editing, setEditing] = useState<Feed>();
   const [importing, setImporting] = useState<Feed>();
   const [removing, setRemoving] = useState<Feed>();
-  const load = useCallback(() => void call<{ feeds: Feed[] }>("/api/v1/feeds?limit=500").then((r) => setRows(r.feeds), () => setRows([])), [call]);
+  const load = useCallback(
+    () =>
+      void call<{ feeds: Feed[] }>("/api/v1/feeds?limit=500").then(
+        (r) => setRows(r.feeds),
+        () => setRows([]),
+      ),
+    [call],
+  );
   useEffect(load, [load]);
 
   const columns: Column<Feed>[] = [
@@ -544,10 +728,29 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
       ),
     },
     { id: "kind", header: t("feedsPage.kind"), cell: (f) => <Badge>{KIND_LABEL(t)[f.kind]}</Badge> },
-    { id: "active", header: t("feedsPage.active"), align: "right", sortValue: (f) => f.indicators.active, cell: (f) => `${f.indicators.active.toLocaleString()} of ${f.indicators.total.toLocaleString()}` },
-    { id: "defaults", header: t("feedsPage.defaults"), cell: (f) => <span className="text-xs">{t("feedsPage.confidenceDays", { defaultConfidence: f.defaultConfidence, defaultSeverity: f.defaultSeverity, defaultTtlDays: f.defaultTtlDays })}</span> },
+    {
+      id: "active",
+      header: t("feedsPage.active"),
+      align: "right",
+      sortValue: (f) => f.indicators.active,
+      cell: (f) => `${f.indicators.active.toLocaleString()} of ${f.indicators.total.toLocaleString()}`,
+    },
+    {
+      id: "defaults",
+      header: t("feedsPage.defaults"),
+      cell: (f) => (
+        <span className="text-xs">
+          {t("feedsPage.confidenceDays", { defaultConfidence: f.defaultConfidence, defaultSeverity: f.defaultSeverity, defaultTtlDays: f.defaultTtlDays })}
+        </span>
+      ),
+    },
     { id: "tlp", header: "TLP", cell: (f) => <TlpBadge tlp={f.defaultTlp} /> },
-    { id: "last", header: t("feedsPage.lastImport"), sortValue: (f) => f.lastImportAt ?? "", cell: (f) => <span className="whitespace-nowrap text-xs">{f.kind === "manual" ? "–" : ago(f.lastImportAt)}</span> },
+    {
+      id: "last",
+      header: t("feedsPage.lastImport"),
+      sortValue: (f) => f.lastImportAt ?? "",
+      cell: (f) => <span className="whitespace-nowrap text-xs">{f.kind === "manual" ? "–" : ago(f.lastImportAt)}</span>,
+    },
     {
       id: "actions",
       header: "",
@@ -586,7 +789,17 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
         }
       />
       <Panel flush>
-        <DataTable label={t("feedsPage.feeds")} columns={columns} rows={rows ?? []} loading={!rows} getRowId={(f) => f.id} minWidth={1000} empty={<EmptyState title={t("feedsPage.noFeedsYet")}>{can("admin") ? t("feedsPage.addTheFirstFeedThen") : t("feedsPage.anAdminAddsTheFeeds")}</EmptyState>} />
+        <DataTable
+          label={t("feedsPage.feeds")}
+          columns={columns}
+          rows={rows ?? []}
+          loading={!rows}
+          getRowId={(f) => f.id}
+          minWidth={1000}
+          empty={
+            <EmptyState title={t("feedsPage.noFeedsYet")}>{can("admin") ? t("feedsPage.addTheFirstFeedThen") : t("feedsPage.anAdminAddsTheFeeds")}</EmptyState>
+          }
+        />
       </Panel>
       {(adding || editing) && (
         <FeedDialog
@@ -613,7 +826,11 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
               <Button type="button" onClick={() => setRemoving(undefined)}>
                 {t("feedsPage.cancel")}
               </Button>
-              <Button type="button" variant="primary" onClick={() => void call(`/api/v1/feeds/${removing.id}`, { method: "DELETE" }).then(() => (setRemoving(undefined), load(), reload()))}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void call(`/api/v1/feeds/${removing.id}`, { method: "DELETE" }).then(() => (setRemoving(undefined), load(), reload()))}
+              >
                 {t("feedsPage.delete3")}
               </Button>
             </>
@@ -638,7 +855,10 @@ function AllowDialog({ call, onClose, onSaved }: { call: Call; onClose: () => vo
   const save = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      await call("/api/v1/allow-list", { method: "POST", body: JSON.stringify({ value, reason, expiresAt: inDays(Number(days)), ...(subdomains && { includeSubdomains: true }) }) });
+      await call("/api/v1/allow-list", {
+        method: "POST",
+        body: JSON.stringify({ value, reason, expiresAt: inDays(Number(days)), ...(subdomains && { includeSubdomains: true }) }),
+      });
       onSaved();
     } catch (err) {
       setError((err as Error).message);
@@ -686,16 +906,67 @@ function AllowListPage({ call, reload }: { call: Call; reload: () => void }) {
   const { can } = useAuth();
   const [rows, setRows] = useState<AllowEntry[]>();
   const [adding, setAdding] = useState(false);
-  const load = useCallback(() => void call<{ entries: AllowEntry[] }>("/api/v1/allow-list?limit=500").then((r) => setRows(r.entries), () => setRows([])), [call]);
+  const load = useCallback(
+    () =>
+      void call<{ entries: AllowEntry[] }>("/api/v1/allow-list?limit=500").then(
+        (r) => setRows(r.entries),
+        () => setRows([]),
+      ),
+    [call],
+  );
   useEffect(load, [load]);
   const columns: Column<AllowEntry>[] = [
     { id: "type", header: t("allowListPage.type"), width: "90px", cell: (a) => <Badge>{TYPE_LABEL[a.type]}</Badge> },
-    { id: "value", header: t("allowListPage.value"), width: "28%", cell: (a) => <span className="threat-intel-wrap font-mono text-xs">{a.value}{a.includeSubdomains ? t("allowListPage.andSubdomains") : ""}</span> },
-    { id: "reason", header: t("allowListPage.reason"), width: "30%", cell: (a) => <span className="threat-intel-clamp text-xs" title={a.reason}>{a.reason}</span> },
+    {
+      id: "value",
+      header: t("allowListPage.value"),
+      width: "28%",
+      cell: (a) => (
+        <span className="threat-intel-wrap font-mono text-xs">
+          {a.value}
+          {a.includeSubdomains ? t("allowListPage.andSubdomains") : ""}
+        </span>
+      ),
+    },
+    {
+      id: "reason",
+      header: t("allowListPage.reason"),
+      width: "30%",
+      cell: (a) => (
+        <span className="threat-intel-clamp text-xs" title={a.reason}>
+          {a.reason}
+        </span>
+      ),
+    },
     { id: "by", header: t("allowListPage.by"), cell: (a) => <span className="text-xs">{a.by ?? ""}</span> },
-    { id: "expires", header: t("allowListPage.until"), sortValue: (a) => a.expiresAt, cell: (a) => (a.active ? <span className="whitespace-nowrap text-xs">{date(a.expiresAt)}</span> : <StatusBadge tone="neutral">{t("allowListPage.ended")}</StatusBadge>) },
+    {
+      id: "expires",
+      header: t("allowListPage.until"),
+      sortValue: (a) => a.expiresAt,
+      cell: (a) =>
+        a.active ? (
+          <span className="whitespace-nowrap text-xs">{date(a.expiresAt)}</span>
+        ) : (
+          <StatusBadge tone="neutral">{t("allowListPage.ended")}</StatusBadge>
+        ),
+    },
     ...(can("editor")
-      ? [{ id: "remove", header: "", align: "right" as const, width: "56px", cell: (a: AllowEntry) => <Button size="sm" icon={<Trash2 />} aria-label={t("allowListPage.remove", { value: a.value })} onClick={() => void call(`/api/v1/allow-list/${a.id}`, { method: "DELETE" }).then(() => (load(), reload()))} /> }]
+      ? [
+          {
+            id: "remove",
+            header: "",
+            align: "right" as const,
+            width: "56px",
+            cell: (a: AllowEntry) => (
+              <Button
+                size="sm"
+                icon={<Trash2 />}
+                aria-label={t("allowListPage.remove", { value: a.value })}
+                onClick={() => void call(`/api/v1/allow-list/${a.id}`, { method: "DELETE" }).then(() => (load(), reload()))}
+              />
+            ),
+          },
+        ]
       : []),
   ];
   return (
@@ -712,7 +983,15 @@ function AllowListPage({ call, reload }: { call: Call; reload: () => void }) {
         }
       />
       <Panel flush>
-        <DataTable label={t("allowListPage.allowList")} columns={columns} rows={rows ?? []} loading={!rows} getRowId={(a) => a.id} minWidth={860} empty={<EmptyState title={t("allowListPage.nothingAllowed")}>{t("allowListPage.valuesAFeedGetsWrong")}</EmptyState>} />
+        <DataTable
+          label={t("allowListPage.allowList")}
+          columns={columns}
+          rows={rows ?? []}
+          loading={!rows}
+          getRowId={(a) => a.id}
+          minWidth={860}
+          empty={<EmptyState title={t("allowListPage.nothingAllowed")}>{t("allowListPage.valuesAFeedGetsWrong")}</EmptyState>}
+        />
       </Panel>
       {adding && (
         <AllowDialog
@@ -774,8 +1053,14 @@ function SettingsPage({ page }: { page: "account" | "members" | "signin" | "toke
   if (page !== "account" && !can("admin")) return <EmptyState title={t("settingsPage.adminsOnly")}>{t("settingsPage.askAnAdminOfThis")}</EmptyState>;
   const titles = {
     account: ["Account", "Your profile, password, two-step verification and where you are signed in."],
-    members: ["Members", "Who can sign in to this threat-intel, and with which role. Viewers see everything but TLP:RED; editors also see TLP:RED, add indicators, import and keep the allow list; admins also change feeds, and manage members and tokens."],
-    signin: ["Sign-in", "Identity providers people can sign in with, such as OpenAsy Identity, Keycloak or Microsoft Entra ID, and which of their groups give which role."],
+    members: [
+      "Members",
+      "Who can sign in to this threat-intel, and with which role. Viewers see everything but TLP:RED; editors also see TLP:RED, add indicators, import and keep the allow list; admins also change feeds, and manage members and tokens.",
+    ],
+    signin: [
+      "Sign-in",
+      "Identity providers people can sign in with, such as OpenAsy Identity, Keycloak or Microsoft Entra ID, and which of their groups give which role.",
+    ],
     tokens: ["API tokens", "For scripts and other products. Each token has one role and an expiry; the secret is shown once."],
   } as const;
   return (
@@ -808,7 +1093,10 @@ function Product() {
   // The install's other products (OPENASY_PRODUCTS), for the switcher; ids this UI does not know are left out.
   useEffect(() => {
     void call<{ products: ProductLink[] }>("/api/v1/products").then(
-      (r) => setProducts(r.products.filter((p): p is ProductLink & { id: ProductId } => p.id !== "threat-intel" && (PRODUCT_IDS as readonly string[]).includes(p.id))),
+      (r) =>
+        setProducts(
+          r.products.filter((p): p is ProductLink & { id: ProductId } => p.id !== "threat-intel" && (PRODUCT_IDS as readonly string[]).includes(p.id)),
+        ),
       () => {},
     );
   }, [call]);

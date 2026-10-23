@@ -20,7 +20,11 @@ describe("openDb", () => {
     const db = openDb(":memory:");
     db.exec(`INSERT INTO feeds VALUES ('f', 'one', 'manual', 30, 50, 'amber', 'medium', NULL, 'now');
       INSERT INTO indicators (id, type, value, feed_id, confidence, tlp, severity, valid_from, valid_until, created_at, updated_at) VALUES ('i', 'ipv4', '198.51.100.1', 'f', 50, 'amber', 'low', 'a', 'b', 'c', 'd')`);
-    expect(() => db.exec("INSERT INTO indicators (id, type, value, feed_id, confidence, tlp, severity, valid_from, valid_until, created_at, updated_at) VALUES ('j', 'ipv4', '198.51.100.1', 'f', 50, 'amber', 'low', 'a', 'b', 'c', 'd')")).toThrow(/UNIQUE/);
+    expect(() =>
+      db.exec(
+        "INSERT INTO indicators (id, type, value, feed_id, confidence, tlp, severity, valid_from, valid_until, created_at, updated_at) VALUES ('j', 'ipv4', '198.51.100.1', 'f', 50, 'amber', 'low', 'a', 'b', 'c', 'd')",
+      ),
+    ).toThrow(/UNIQUE/);
     db.exec("DELETE FROM feeds");
     expect(db.prepare("SELECT COUNT(*) AS n FROM indicators").get()).toEqual({ n: 0 });
   });

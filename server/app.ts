@@ -34,7 +34,14 @@ export interface AppOptions {
 
 function metricsText(intel: Intel, version: string) {
   const s = intel.summary();
-  return renderMetrics(version, { feeds: s.feeds, active: s.indicators.active, byType: s.byType, allowListed: s.allowListed, lookups: s.lookups.total, hits: s.lookups.hits });
+  return renderMetrics(version, {
+    feeds: s.feeds,
+    active: s.indicators.active,
+    byType: s.byType,
+    allowListed: s.allowListed,
+    lookups: s.lookups.total,
+    hits: s.lookups.hits,
+  });
 }
 
 /** Serves only /metrics, for a port that is not exposed with the rest (THREAT_INTEL_METRICS_PORT). */
@@ -71,7 +78,8 @@ function send(res: ServerResponse, status: number, body: string | Buffer, type =
   res.end(body);
 }
 
-const json = (res: ServerResponse, status: number, data: unknown, headers?: Record<string, string>) => send(res, status, JSON.stringify(data), "application/json", headers);
+const json = (res: ServerResponse, status: number, data: unknown, headers?: Record<string, string>) =>
+  send(res, status, JSON.stringify(data), "application/json", headers);
 
 const TITLES: Record<ProblemCode, string> = {
   "invalid-token": "Invalid token",
@@ -125,7 +133,8 @@ async function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
 
 async function readJson(req: IncomingMessage, limit = 64 * 1024): Promise<Record<string, unknown>> {
   const raw = await readBody(req, limit).catch((err: unknown) => {
-    if (err instanceof IntelError && err.code === "payload-too-large") throw new IntelError(400, "invalid-json", `The body must be JSON, at most ${Math.round(limit / 1024)} KiB.`);
+    if (err instanceof IntelError && err.code === "payload-too-large")
+      throw new IntelError(400, "invalid-json", `The body must be JSON, at most ${Math.round(limit / 1024)} KiB.`);
     throw err;
   });
   try {
@@ -177,7 +186,8 @@ export function createApp({ db, intel, version, auth, adminToken, ingestToken, w
   };
   const cursor = (url: URL) => url.searchParams.get("cursor") ?? undefined;
   const limit = (url: URL) => parseLimit(url.searchParams.get("limit"));
-  const page = <K extends string, T>(key: K, p: { items: T[]; nextCursor?: string }) => ({ [key]: p.items, ...(p.nextCursor && { nextCursor: p.nextCursor }) }) as Record<K, T[]> & { nextCursor?: string };
+  const page = <K extends string, T>(key: K, p: { items: T[]; nextCursor?: string }) =>
+    ({ [key]: p.items, ...(p.nextCursor && { nextCursor: p.nextCursor }) }) as Record<K, T[]> & { nextCursor?: string };
 
   const routes: Route[] = [
     { method: "GET", path: "/api/v1/version", auth: "none", handle: () => ({ product: "threat-intel", version }) },
@@ -207,7 +217,14 @@ export function createApp({ db, intel, version, auth, adminToken, ingestToken, w
         page(
           "indicators",
           intel.listIndicators(
-            { type: query(url, "type"), feed: query(url, "feed"), q: query(url, "q"), tlp: query(url, "tlp"), severity: query(url, "severity"), status: url.searchParams.get("status") ?? "active" },
+            {
+              type: query(url, "type"),
+              feed: query(url, "feed"),
+              q: query(url, "q"),
+              tlp: query(url, "tlp"),
+              severity: query(url, "severity"),
+              status: url.searchParams.get("status") ?? "active",
+            },
             cursor(url),
             limit(url),
             caller,
@@ -242,7 +259,12 @@ export function createApp({ db, intel, version, auth, adminToken, ingestToken, w
 
     // The allow list: what is known to be fine, with a reason and an end date.
     { method: "GET", path: "/api/v1/allow-list", auth: "viewer", handle: ({ url }) => page("entries", intel.listAllow(cursor(url), limit(url))) },
-    { method: "POST", path: "/api/v1/allow-list", auth: "editor", handle: async ({ res, body, caller }) => json(res, 201, intel.createAllow(await body(), caller.actor)) },
+    {
+      method: "POST",
+      path: "/api/v1/allow-list",
+      auth: "editor",
+      handle: async ({ res, body, caller }) => json(res, 201, intel.createAllow(await body(), caller.actor)),
+    },
     { method: "DELETE", path: "/api/v1/allow-list/:id", auth: "editor", handle: ({ res, params }) => (intel.deleteAllow(params[0]!), noContent(res)) },
   ];
 
@@ -256,7 +278,8 @@ export function createApp({ db, intel, version, auth, adminToken, ingestToken, w
     if (tokenMatches(header, adminToken)) return { role: "admin", actor: "admin token" };
     if (access === "ingest") {
       // An API token or a session with the editor role can import too, for scripts set up from Settings.
-      if (!ingestToken && !header?.startsWith("Bearer oa_")) throw new IntelError(503, "not-configured", "Set THREAT_INTEL_INGEST_TOKEN on threat-intel, or send an API token with the editor role.");
+      if (!ingestToken && !header?.startsWith("Bearer oa_"))
+        throw new IntelError(503, "not-configured", "Set THREAT_INTEL_INGEST_TOKEN on threat-intel, or send an API token with the editor role.");
       if (!header?.startsWith("Bearer oa_")) throw new IntelError(401, "invalid-token", "Send THREAT_INTEL_INGEST_TOKEN or an API token as a bearer token.");
     }
     const p = auth.authorize(req, access === "ingest" ? "editor" : access === "lookup" ? "viewer" : access);

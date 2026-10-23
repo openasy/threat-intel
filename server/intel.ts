@@ -5,15 +5,7 @@ import { detectType, networksContaining, NormalizeError, normalizeIndicator, TYP
 import { parseStixPattern, StixPatternError } from "./stix.ts";
 
 export type ProblemCode =
-  | "invalid-token"
-  | "invalid-json"
-  | "invalid-body"
-  | "invalid-import"
-  | "not-found"
-  | "conflict"
-  | "not-configured"
-  | "payload-too-large"
-  | "internal-error";
+  "invalid-token" | "invalid-json" | "invalid-body" | "invalid-import" | "not-found" | "conflict" | "not-configured" | "payload-too-large" | "internal-error";
 
 export class IntelError extends Error {
   readonly status: number;
@@ -103,7 +95,8 @@ const date = (value: unknown, name: string) => {
   return new Date(t).toISOString();
 };
 const labelsOf = (value: unknown): string[] => {
-  if (!Array.isArray(value) || value.length > 20 || value.some((l) => typeof l !== "string" || !l.trim() || l.length > 64)) throw bad("labels must be up to 20 short strings.");
+  if (!Array.isArray(value) || value.length > 20 || value.some((l) => typeof l !== "string" || !l.trim() || l.length > 64))
+    throw bad("labels must be up to 20 short strings.");
   return [...new Set(value.map((l: string) => l.trim()))];
 };
 const noExtra = (rest: object, expected: string) => {
@@ -174,8 +167,21 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
     const validFrom = c.validFrom ?? at;
     const validUntil = c.validUntil ?? new Date(Date.parse(at) + feed.default_ttl_days * 86_400_000).toISOString();
     upsert.run(
-      randomUUID(), c.type, c.value, feed.id, c.confidence ?? feed.default_confidence, c.tlp ?? feed.default_tlp, c.severity ?? feed.default_severity,
-      JSON.stringify(c.labels ?? []), c.description ?? null, c.type === "domain" && c.includeSubdomains ? 1 : 0, validFrom, validUntil, c.revoked ? 1 : 0, at, at,
+      randomUUID(),
+      c.type,
+      c.value,
+      feed.id,
+      c.confidence ?? feed.default_confidence,
+      c.tlp ?? feed.default_tlp,
+      c.severity ?? feed.default_severity,
+      JSON.stringify(c.labels ?? []),
+      c.description ?? null,
+      c.type === "domain" && c.includeSubdomains ? 1 : 0,
+      validFrom,
+      validUntil,
+      c.revoked ? 1 : 0,
+      at,
+      at,
     );
     return isNew;
   }
@@ -183,7 +189,11 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
   function presentFeed(f: Record<string, any>) {
     const at = now();
     const total = (db.prepare("SELECT COUNT(*) AS n FROM indicators WHERE feed_id = ?").get(f.id) as { n: number }).n;
-    const active = (db.prepare("SELECT COUNT(*) AS n FROM indicators WHERE feed_id = ? AND revoked = 0 AND valid_from <= ? AND valid_until > ?").get(f.id, at, at) as { n: number }).n;
+    const active = (
+      db.prepare("SELECT COUNT(*) AS n FROM indicators WHERE feed_id = ? AND revoked = 0 AND valid_from <= ? AND valid_until > ?").get(f.id, at, at) as {
+        n: number;
+      }
+    ).n;
     return {
       id: f.id as string,
       name: f.name as string,
@@ -221,7 +231,8 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
   }
 
   const indicatorRow = (id: string) => {
-    const r = db.prepare("SELECT i.*, f.name AS feed_name FROM indicators i JOIN feeds f ON f.id = i.feed_id WHERE i.id = ?").get(id) as IndicatorRow | undefined;
+    const r = db.prepare("SELECT i.*, f.name AS feed_name FROM indicators i JOIN feeds f ON f.id = i.feed_id WHERE i.id = ?").get(id) as
+      IndicatorRow | undefined;
     if (!r) throw notFound("The indicator");
     return r;
   };
@@ -255,15 +266,25 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
     if (n.type === "domain") {
       const labels = n.value.split(".");
       const parents = labels.map((_, i) => labels.slice(i).join(".")).filter((d) => d.includes("."));
-      const rows = withList((m) => base(`i.type = 'domain' AND i.value IN (${m}) AND (i.value = ? OR i.include_subdomains = 1)`), parents.length).all(...common, ...parents, n.value) as unknown as IndicatorRow[];
+      const rows = withList((m) => base(`i.type = 'domain' AND i.value IN (${m}) AND (i.value = ? OR i.include_subdomains = 1)`), parents.length).all(
+        ...common,
+        ...parents,
+        n.value,
+      ) as unknown as IndicatorRow[];
       for (const row of rows) found.push({ row, via: row.value === n.value ? "exact" : "subdomain" });
-      allowRows = withList((m) => allowBase(`a.type = 'domain' AND a.value IN (${m}) AND (a.value = ? OR a.include_subdomains = 1)`), parents.length).all(at, ...parents, n.value) as Array<Record<string, any>>;
+      allowRows = withList((m) => allowBase(`a.type = 'domain' AND a.value IN (${m}) AND (a.value = ? OR a.include_subdomains = 1)`), parents.length).all(
+        at,
+        ...parents,
+        n.value,
+      ) as Array<Record<string, any>>;
     } else {
-      for (const row of db.prepare(base("i.type = ? AND i.value = ?")).all(...common, n.type, n.value) as unknown as IndicatorRow[]) found.push({ row, via: "exact" });
+      for (const row of db.prepare(base("i.type = ? AND i.value = ?")).all(...common, n.type, n.value) as unknown as IndicatorRow[])
+        found.push({ row, via: "exact" });
       allowRows = db.prepare(allowBase("a.type = ? AND a.value = ?")).all(at, n.type, n.value) as Array<Record<string, any>>;
       if (isIp) {
         const nets = networksContaining(n.value);
-        for (const row of withList((m) => base(`i.type = 'cidr' AND i.value IN (${m})`), nets.length).all(...common, ...nets) as unknown as IndicatorRow[]) found.push({ row, via: "cidr" });
+        for (const row of withList((m) => base(`i.type = 'cidr' AND i.value IN (${m})`), nets.length).all(...common, ...nets) as unknown as IndicatorRow[])
+          found.push({ row, via: "cidr" });
         allowRows.push(...(withList((m) => allowBase(`a.type = 'cidr' AND a.value IN (${m})`), nets.length).all(at, ...nets) as Array<Record<string, any>>));
       }
     }
@@ -283,16 +304,32 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       matches: found
         .sort((a, b) => b.row.confidence - a.row.confidence)
         .map(({ row, via }) => ({
-          id: row.id, type: row.type, value: row.value, feed: { id: row.feed_id, name: row.feed_name }, confidence: row.confidence, severity: row.severity, tlp: row.tlp,
-          labels: JSON.parse(row.labels) as string[], description: row.description, validUntil: row.valid_until, via,
+          id: row.id,
+          type: row.type,
+          value: row.value,
+          feed: { id: row.feed_id, name: row.feed_name },
+          confidence: row.confidence,
+          severity: row.severity,
+          tlp: row.tlp,
+          labels: JSON.parse(row.labels) as string[],
+          description: row.description,
+          validUntil: row.valid_until,
+          via,
         })),
       allowed: allow ? { reason: allow.reason as string, expiresAt: allow.expires_at as string } : null,
     };
   }
 
   const allowPresent = (a: Record<string, any>) => ({
-    id: a.id as string, type: a.type as IndicatorType, value: a.value as string, includeSubdomains: a.include_subdomains === 1, reason: a.reason as string,
-    by: (a.created_by as string | null) ?? null, createdAt: a.created_at as string, expiresAt: a.expires_at as string, active: (a.expires_at as string) > now(),
+    id: a.id as string,
+    type: a.type as IndicatorType,
+    value: a.value as string,
+    includeSubdomains: a.include_subdomains === 1,
+    reason: a.reason as string,
+    by: (a.created_by as string | null) ?? null,
+    createdAt: a.created_at as string,
+    expiresAt: a.expires_at as string,
+    active: (a.expires_at as string) > now(),
   });
 
   return {
@@ -303,9 +340,9 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       const d = feedFields({ defaultTtlDays, defaultConfidence, defaultTlp, defaultSeverity }, { ttl: 30, confidence: 50, tlp: "amber", severity: "medium" });
       if (db.prepare("SELECT 1 FROM feeds WHERE name = ?").get(name)) throw new IntelError(409, "conflict", "A feed with this name exists.");
       const id = randomUUID();
-      db.prepare("INSERT INTO feeds (id, name, kind, default_ttl_days, default_confidence, default_tlp, default_severity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
-        id, name, oneOf(KINDS, kind, "kind"), d.ttl, d.confidence, d.tlp, d.severity, now(),
-      );
+      db.prepare(
+        "INSERT INTO feeds (id, name, kind, default_ttl_days, default_confidence, default_tlp, default_severity, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(id, name, oneOf(KINDS, kind, "kind"), d.ttl, d.confidence, d.tlp, d.severity, now());
       return presentFeed(feedRow(id));
     },
 
@@ -321,13 +358,24 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       const f = feedRow(id);
       const { name, defaultTtlDays, defaultConfidence, defaultTlp, defaultSeverity, ...rest } = body;
       noExtra(rest, "{ name?, defaultTtlDays?, defaultConfidence?, defaultTlp?, defaultSeverity? }");
-      if (name === undefined && defaultTtlDays === undefined && defaultConfidence === undefined && defaultTlp === undefined && defaultSeverity === undefined) throw bad("Send at least one field to change.");
+      if (name === undefined && defaultTtlDays === undefined && defaultConfidence === undefined && defaultTlp === undefined && defaultSeverity === undefined)
+        throw bad("Send at least one field to change.");
       if (name !== undefined) {
         if (typeof name !== "string" || !FEED_NAME.test(name)) throw bad("name is up to 64 letters, digits, spaces and . _ -.");
         if (db.prepare("SELECT 1 FROM feeds WHERE name = ? AND id <> ?").get(name, id)) throw new IntelError(409, "conflict", "A feed with this name exists.");
       }
-      const d = feedFields({ defaultTtlDays, defaultConfidence, defaultTlp, defaultSeverity }, { ttl: f.default_ttl_days, confidence: f.default_confidence, tlp: f.default_tlp, severity: f.default_severity });
-      db.prepare("UPDATE feeds SET name = ?, default_ttl_days = ?, default_confidence = ?, default_tlp = ?, default_severity = ? WHERE id = ?").run(name ?? f.name, d.ttl, d.confidence, d.tlp, d.severity, id);
+      const d = feedFields(
+        { defaultTtlDays, defaultConfidence, defaultTlp, defaultSeverity },
+        { ttl: f.default_ttl_days, confidence: f.default_confidence, tlp: f.default_tlp, severity: f.default_severity },
+      );
+      db.prepare("UPDATE feeds SET name = ?, default_ttl_days = ?, default_confidence = ?, default_tlp = ?, default_severity = ? WHERE id = ?").run(
+        name ?? f.name,
+        d.ttl,
+        d.confidence,
+        d.tlp,
+        d.severity,
+        id,
+      );
       return presentFeed(feedRow(id));
     },
 
@@ -338,7 +386,8 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
     /** Reads an import by the feed's kind and stores what it holds. Nothing it cannot read is dropped without a word. */
     importFeed(feedId: string, raw: Buffer) {
       const feed = feedRow(feedId);
-      if (feed.kind === "manual") throw new IntelError(409, "conflict", "A manual feed takes indicators one at a time; create a feed of kind stix, csv or text to import.");
+      if (feed.kind === "manual")
+        throw new IntelError(409, "conflict", "A manual feed takes indicators one at a time; create a feed of kind stix, csv or text to import.");
       const at = now();
       const skipped: Array<{ ref: string; reason: string }> = [];
       const unparsed: Array<{ id: string; pattern: string; reason: string }> = [];
@@ -374,7 +423,12 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
           const i = header.indexOf(name);
           return i < 0 ? "" : (row[i] ?? "").trim();
         };
-        if (!header.includes("value")) throw new IntelError(422, "invalid-import", "The first row must name the columns, and one of them must be value (optional: type, confidence, tlp, severity, tags, description, valid_from, valid_until, include_subdomains).");
+        if (!header.includes("value"))
+          throw new IntelError(
+            422,
+            "invalid-import",
+            "The first row must name the columns, and one of them must be value (optional: type, confidence, tlp, severity, tags, description, valid_from, valid_until, include_subdomains).",
+          );
         rows.slice(1).forEach((row, i) => {
           received++;
           const ref = `row ${i + 2}`;
@@ -385,7 +439,13 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
             if (col(row, "tlp")) c.tlp = oneOf(TLPS, col(row, "tlp").toLowerCase(), "tlp");
             if (col(row, "severity")) c.severity = oneOf(SEVERITIES, col(row, "severity").toLowerCase(), "severity");
             const tags = col(row, "tags") || col(row, "labels");
-            if (tags) c.labels = labelsOf(tags.split(/[;|]/).map((t) => t.trim()).filter(Boolean));
+            if (tags)
+              c.labels = labelsOf(
+                tags
+                  .split(/[;|]/)
+                  .map((t) => t.trim())
+                  .filter(Boolean),
+              );
             if (col(row, "description")) c.description = col(row, "description").slice(0, 1000);
             if (col(row, "valid_from")) c.validFrom = date(col(row, "valid_from"), "valid_from");
             if (col(row, "valid_until")) c.validUntil = date(col(row, "valid_until"), "valid_until");
@@ -402,7 +462,11 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
         } catch {
           throw new IntelError(422, "invalid-import", "The body is not JSON; a stix feed takes a STIX 2.1 bundle.");
         }
-        const objects: unknown[] | null = Array.isArray(body) ? body : body && typeof body === "object" && body.type === "bundle" && Array.isArray(body.objects) ? body.objects : null;
+        const objects: unknown[] | null = Array.isArray(body)
+          ? body
+          : body && typeof body === "object" && body.type === "bundle" && Array.isArray(body.objects)
+            ? body.objects
+            : null;
         if (!objects) throw new IntelError(422, "invalid-import", "Send a STIX 2.1 bundle: a JSON object with type bundle and an objects array.");
         for (const obj of objects as Array<Record<string, any>>) {
           if (!obj || typeof obj !== "object" || obj.type !== "indicator") continue;
@@ -428,7 +492,9 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
             if (obj.valid_until !== undefined) c.validUntil = date(obj.valid_until, "valid_until");
             const marking = (Array.isArray(obj.object_marking_refs) ? obj.object_marking_refs : []).map((r: unknown) => TLP_MARKINGS[String(r)]).find(Boolean);
             if (marking) c.tlp = marking;
-            const labels = [...(Array.isArray(obj.labels) ? obj.labels : []), ...(Array.isArray(obj.indicator_types) ? obj.indicator_types : [])].filter((l): l is string => typeof l === "string" && !!l.trim() && l.length <= 64);
+            const labels = [...(Array.isArray(obj.labels) ? obj.labels : []), ...(Array.isArray(obj.indicator_types) ? obj.indicator_types : [])].filter(
+              (l): l is string => typeof l === "string" && !!l.trim() && l.length <= 64,
+            );
             c.labels = [...new Set(labels)].slice(0, 20);
             const description = typeof obj.description === "string" ? obj.description : typeof obj.name === "string" ? obj.name : undefined;
             if (description) c.description = description.slice(0, 1000);
@@ -494,11 +560,18 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       if (validUntil !== undefined) c.validUntil = date(validUntil, "validUntil");
       if (c.validFrom && c.validUntil && c.validUntil <= c.validFrom) throw bad("validUntil must be after validFrom.");
       store(f, c, now());
-      const row = db.prepare("SELECT i.*, fe.name AS feed_name FROM indicators i JOIN feeds fe ON fe.id = i.feed_id WHERE i.type = ? AND i.value = ? AND i.feed_id = ?").get(n.type, n.value, f.id) as unknown as IndicatorRow;
+      const row = db
+        .prepare("SELECT i.*, fe.name AS feed_name FROM indicators i JOIN feeds fe ON fe.id = i.feed_id WHERE i.type = ? AND i.value = ? AND i.feed_id = ?")
+        .get(n.type, n.value, f.id) as unknown as IndicatorRow;
       return presentIndicator(row);
     },
 
-    listIndicators(q: { type?: string; feed?: string; q?: string; tlp?: string; severity?: string; status: string }, cursor: string | undefined, limit: number, caller: Caller) {
+    listIndicators(
+      q: { type?: string; feed?: string; q?: string; tlp?: string; severity?: string; status: string },
+      cursor: string | undefined,
+      limit: number,
+      caller: Caller,
+    ) {
       const where: string[] = [];
       const args: SQLInputValue[] = [];
       const at = now();
@@ -513,9 +586,14 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       if (!SEES_RED(caller.role)) where.push("i.tlp <> 'red'");
       const offset = decodeCursor(cursor);
       const rows = db
-        .prepare(`SELECT i.*, f.name AS feed_name FROM indicators i JOIN feeds f ON f.id = i.feed_id ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY i.updated_at DESC, i.id LIMIT ? OFFSET ?`)
+        .prepare(
+          `SELECT i.*, f.name AS feed_name FROM indicators i JOIN feeds f ON f.id = i.feed_id ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY i.updated_at DESC, i.id LIMIT ? OFFSET ?`,
+        )
         .all(...args, limit + 1, offset) as unknown as IndicatorRow[];
-      return { items: rows.slice(0, limit).map(presentIndicator), ...(rows.length > limit && { nextCursor: encodeCursor(offset + limit) }) } satisfies Page<unknown>;
+      return {
+        items: rows.slice(0, limit).map(presentIndicator),
+        ...(rows.length > limit && { nextCursor: encodeCursor(offset + limit) }),
+      } satisfies Page<unknown>;
     },
 
     indicator(id: string, caller: Caller) {
@@ -535,7 +613,8 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       const red = SEES_RED(caller.role);
       const results = items.map((it: unknown, i) => {
         const item = it as { type?: unknown; value?: unknown } | null;
-        if (!item || typeof item !== "object" || typeof item.value !== "string" || (item.type !== undefined && typeof item.type !== "string")) throw bad(`items[${i}] must be { value, type? }.`);
+        if (!item || typeof item !== "object" || typeof item.value !== "string" || (item.type !== undefined && typeof item.type !== "string"))
+          throw bad(`items[${i}] must be { value, type? }.`);
         if (item.type === "cidr") throw bad(`items[${i}]: look up an address, not a block; blocks that contain it are found for you.`);
         try {
           return lookupOne(normalizeIndicator(item.type, item.value), at, red);
@@ -567,11 +646,12 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       const end = date(expiresAt, "expiresAt");
       if (Date.parse(end) <= Date.now()) throw bad("expiresAt must be in the future.");
       if (Date.parse(end) > Date.now() + MAX_ALLOW_DAYS * 86_400_000) throw bad(`expiresAt must be within ${MAX_ALLOW_DAYS} days.`);
-      if (db.prepare("SELECT 1 FROM allow_list WHERE type = ? AND value = ?").get(n.type, n.value)) throw new IntelError(409, "conflict", "This value is already on the allow list.");
+      if (db.prepare("SELECT 1 FROM allow_list WHERE type = ? AND value = ?").get(n.type, n.value))
+        throw new IntelError(409, "conflict", "This value is already on the allow list.");
       const id = randomUUID();
-      db.prepare("INSERT INTO allow_list (id, type, value, include_subdomains, reason, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
-        id, n.type, n.value, n.type === "domain" && includeSubdomains === true ? 1 : 0, reason.trim(), by, now(), end,
-      );
+      db.prepare(
+        "INSERT INTO allow_list (id, type, value, include_subdomains, reason, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      ).run(id, n.type, n.value, n.type === "domain" && includeSubdomains === true ? 1 : 0, reason.trim(), by, now(), end);
       return allowPresent(db.prepare("SELECT * FROM allow_list WHERE id = ?").get(id) as Record<string, any>);
     },
 
@@ -588,7 +668,10 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
     summary() {
       const at = now();
       const byType = Object.fromEntries(TYPES.map((t) => [t, 0])) as Record<IndicatorType, number>;
-      for (const r of db.prepare("SELECT type, COUNT(*) AS n FROM indicators WHERE revoked = 0 AND valid_from <= ? AND valid_until > ? GROUP BY type").all(at, at) as Array<{ type: IndicatorType; n: number }>) byType[r.type] = r.n;
+      for (const r of db
+        .prepare("SELECT type, COUNT(*) AS n FROM indicators WHERE revoked = 0 AND valid_from <= ? AND valid_until > ? GROUP BY type")
+        .all(at, at) as Array<{ type: IndicatorType; n: number }>)
+        byType[r.type] = r.n;
       const total = (db.prepare("SELECT COUNT(*) AS n FROM indicators").get() as { n: number }).n;
       const active = Object.values(byType).reduce((a, b) => a + b, 0);
       return {
@@ -622,7 +705,7 @@ export function parseCsv(text: string): string[][] {
     const c = text[i]!;
     if (quoted) {
       if (c === '"') {
-        if (text[i + 1] === '"') (cell += '"', i++);
+        if (text[i + 1] === '"') ((cell += '"'), i++);
         else quoted = false;
       } else cell += c;
     } else if (c === '"' && cell === "") quoted = true;

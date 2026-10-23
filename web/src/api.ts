@@ -58,7 +58,19 @@ export interface LookupResult {
   severity: Severity | null;
   tlp: Tlp | null;
   feeds: string[];
-  matches: Array<{ id: string; type: IndicatorType; value: string; feed: FeedRef; confidence: number; severity: Severity; tlp: Tlp; labels: string[]; description: string | null; validUntil: string; via: "exact" | "cidr" | "subdomain" }>;
+  matches: Array<{
+    id: string;
+    type: IndicatorType;
+    value: string;
+    feed: FeedRef;
+    confidence: number;
+    severity: Severity;
+    tlp: Tlp;
+    labels: string[];
+    description: string | null;
+    validUntil: string;
+    via: "exact" | "cidr" | "subdomain";
+  }>;
   allowed: { reason: string; expiresAt: string } | null;
 }
 
@@ -89,7 +101,11 @@ export class ApiError extends Error {}
 
 // The session is an HttpOnly cookie set by sign-in (@openasy/auth); the browser sends it, nothing is stored here.
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, { ...init, credentials: "same-origin", headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...init.headers } });
+  const res = await fetch(path, {
+    ...init,
+    credentials: "same-origin",
+    headers: { ...(init.body ? { "content-type": "application/json" } : {}), ...init.headers },
+  });
   if (!res.ok) {
     const problem = (await res.json().catch(() => ({}))) as { code?: string; detail?: string };
     if (res.status === 401) throw new Unauthorized(problem.detail);

@@ -24,7 +24,10 @@ describe("matching", () => {
     add(f, "203.0.113.0/24");
     const r = look("198.51.100.7");
     expect(r).toMatchObject({ type: "ipv4", verdict: "malicious", confidence: 70, feeds: ["manual"] });
-    expect(r.matches.map((m) => [m.value, m.via])).toEqual([["198.51.100.0/24", "cidr"], ["198.51.0.0/16", "cidr"]]);
+    expect(r.matches.map((m) => [m.value, m.via])).toEqual([
+      ["198.51.100.0/24", "cidr"],
+      ["198.51.0.0/16", "cidr"],
+    ]);
     expect(look("198.51.99.1")).toMatchObject({ verdict: "suspicious", confidence: 30 });
     expect(look("192.0.2.1")).toMatchObject({ verdict: "unknown", confidence: null, matches: [] });
     expect(look("2001:db8::1")).toMatchObject({ type: "ipv6", verdict: "unknown" });
@@ -36,7 +39,11 @@ describe("matching", () => {
     add(f, "2001:db8::/32");
     add(f, "2001:DB8:0:0:0:0:0:99");
     expect(look("2001:db8:1::5").matches.map((m) => m.via)).toEqual(["cidr"]);
-    expect(look("2001:db8::99").matches.map((m) => m.via).sort()).toEqual(["cidr", "exact"]);
+    expect(
+      look("2001:db8::99")
+        .matches.map((m) => m.via)
+        .sort(),
+    ).toEqual(["cidr", "exact"]);
     expect(look("2001:db9::1").verdict).toBe("unknown");
   });
 
@@ -150,7 +157,8 @@ describe("allow list", () => {
     add(feed(), "198.51.100.10");
     intel.createAllow({ value: "198.51.100.10", reason: "Temporary", expiresAt: later(1) }, "ada");
     expect(look("198.51.100.10").verdict).toBe("allowed");
-    const bad = (body: Record<string, unknown>) => () => intel.createAllow({ value: "198.51.100.11", reason: "fine for now", expiresAt: later(5), ...body }, "ada");
+    const bad = (body: Record<string, unknown>) => () =>
+      intel.createAllow({ value: "198.51.100.11", reason: "fine for now", expiresAt: later(5), ...body }, "ada");
     expect(bad({ reason: "" })).toThrow(/reason/);
     expect(bad({ expiresAt: later(-1) })).toThrow(/future/);
     expect(bad({ expiresAt: later(400) })).toThrow(/366/);
@@ -177,11 +185,24 @@ describe("importing", () => {
       return { intel: s.intel, look: s.look };
     })();
     const f = intel.createFeed({ name: "csv", kind: "csv" }).id;
-    const csv = ['type,value,confidence,tlp,severity,tags,description,include_subdomains', 'domain,Bad.Example.com,80,green,high,"phish;kit","A ""quoted"", comma",yes', ",198.51.100.20,,,,,,", "ipv4,198.51.100.21,150,,,,,", "domain,,50,,,,,", "ipv4,198.51.100.22,50,purple,,,,"].join("\r\n");
+    const csv = [
+      "type,value,confidence,tlp,severity,tags,description,include_subdomains",
+      'domain,Bad.Example.com,80,green,high,"phish;kit","A ""quoted"", comma",yes',
+      ",198.51.100.20,,,,,,",
+      "ipv4,198.51.100.21,150,,,,,",
+      "domain,,50,,,,,",
+      "ipv4,198.51.100.22,50,purple,,,,",
+    ].join("\r\n");
     const r = intel.importFeed(f, Buffer.from(csv));
     expect(r).toMatchObject({ received: 5, created: 2, skippedCount: 3 });
     expect(r.skipped.map((s) => s.ref)).toEqual(["row 4", "row 5", "row 6"]);
-    expect(look("x.bad.example.com")).toMatchObject({ verdict: "malicious", confidence: 80, severity: "high", tlp: "green", matches: [{ labels: ["phish", "kit"], description: 'A "quoted", comma' }] });
+    expect(look("x.bad.example.com")).toMatchObject({
+      verdict: "malicious",
+      confidence: 80,
+      severity: "high",
+      tlp: "green",
+      matches: [{ labels: ["phish", "kit"], description: 'A "quoted", comma' }],
+    });
     expect(() => intel.importFeed(f, Buffer.from("ip,confidence\n1.2.3.4,5\n"))).toThrow(/must name the columns/);
   });
 
@@ -195,7 +216,13 @@ describe("importing", () => {
       f,
       Buffer.from(
         bundle(
-          { pattern: "[ipv4-addr:value = '198.51.100.30' OR domain-name:value = 'c2.example.com']", confidence: 85, tlp: "red", labels: ["malicious-activity"], name: "C2 server" },
+          {
+            pattern: "[ipv4-addr:value = '198.51.100.30' OR domain-name:value = 'c2.example.com']",
+            confidence: 85,
+            tlp: "red",
+            labels: ["malicious-activity"],
+            name: "C2 server",
+          },
           { pattern: "[ipv4-addr:value = '198.51.100.31']", revoked: true },
           { pattern: "[ipv4-addr:value = '198.51.100.32' AND domain-name:value = 'a.example.com']" },
           { pattern: "[process:name = 'cmd.exe']" },
@@ -205,7 +232,12 @@ describe("importing", () => {
     );
     expect(r).toMatchObject({ received: 5, created: 3, revoked: 1, unparsedCount: 3 });
     expect(r.unparsed.map((u) => u.reason)).toEqual([expect.stringMatching(/AND/), expect.stringMatching(/process:name/), expect.stringMatching(/snort/)]);
-    expect(look("c2.example.com")).toMatchObject({ verdict: "malicious", confidence: 85, tlp: "red", matches: [{ labels: ["malicious-activity"], description: "C2 server" }] });
+    expect(look("c2.example.com")).toMatchObject({
+      verdict: "malicious",
+      confidence: 85,
+      tlp: "red",
+      matches: [{ labels: ["malicious-activity"], description: "C2 server" }],
+    });
     expect(look("c2.example.com", viewer).verdict).toBe("unknown");
     expect(look("198.51.100.31").verdict).toBe("unknown");
     expect(intel.listIndicators({ status: "inactive" }, undefined, 10, editor).items.map((i) => i.value)).toEqual(["198.51.100.31"]);
@@ -224,7 +256,10 @@ describe("importing", () => {
 
 describe("csv", () => {
   it("reads quotes, doubled quotes and both line endings", () => {
-    expect(parseCsv('a,"b,c","d""e"\r\n1,2,3\n\n')).toEqual([["a", "b,c", 'd"e'], ["1", "2", "3"]]);
+    expect(parseCsv('a,"b,c","d""e"\r\n1,2,3\n\n')).toEqual([
+      ["a", "b,c", 'd"e'],
+      ["1", "2", "3"],
+    ]);
   });
 });
 
@@ -235,7 +270,9 @@ describe("speed", () => {
     const at = new Date().toISOString();
     const until = later(30);
     db.exec("BEGIN");
-    const ins = db.prepare("INSERT INTO indicators (id, type, value, feed_id, confidence, tlp, severity, labels, valid_from, valid_until, created_at, updated_at) VALUES (?, ?, ?, ?, 50, 'amber', 'medium', '[]', ?, ?, ?, ?)");
+    const ins = db.prepare(
+      "INSERT INTO indicators (id, type, value, feed_id, confidence, tlp, severity, labels, valid_from, valid_until, created_at, updated_at) VALUES (?, ?, ?, ?, 50, 'amber', 'medium', '[]', ?, ?, ?, ?)",
+    );
     for (let i = 0; i < 95_000; i++) ins.run(`i${i}`, "domain", `host${i}.example.net`, f, at, until, at, at);
     for (let i = 0; i < 5_000; i++) ins.run(`d${i}`, "ipv4", `10.${i % 250}.${Math.floor(i / 250)}.1`, f, at, until, at, at);
     for (let i = 0; i < 4_096; i++) ins.run(`c${i}`, "cidr", `172.${16 + (i % 16)}.${Math.floor(i / 16) % 256}.0/24`, f, at, until, at, at);

@@ -121,7 +121,10 @@ export function normalizeIndicator(type: string | undefined | null, raw: string)
   const value = refang(String(raw));
   if (!value) throw new NormalizeError("the value is empty");
   const t = (type ?? detectType(value)) as IndicatorType | null;
-  if (!t || !(TYPES as readonly string[]).includes(t)) throw new NormalizeError(type ? `type must be one of ${TYPES.join(", ")}` : `cannot tell what kind of indicator ${JSON.stringify(value.slice(0, 40))} is; give its type`);
+  if (!t || !(TYPES as readonly string[]).includes(t))
+    throw new NormalizeError(
+      type ? `type must be one of ${TYPES.join(", ")}` : `cannot tell what kind of indicator ${JSON.stringify(value.slice(0, 40))} is; give its type`,
+    );
   switch (t) {
     case "ipv4": {
       const parts = parseV4(value);

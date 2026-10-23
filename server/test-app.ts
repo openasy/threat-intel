@@ -65,7 +65,10 @@ export async function startApp(opts: Partial<AppOptions> & { version: string }) 
   const base = `http://localhost:${(server.address() as AddressInfo).port}`;
   const auth = createAuth({ db, product: "threat-intel", productName: "OpenAsy Threat Intel", origin: base });
   handler = createApp({ db, intel, auth, ingestToken: INGEST_TOKEN, adminToken: ADMIN_TOKEN, ...opts });
-  const as = (token: string) => (path: string, init: RequestInit = {}) => fetch(base + path, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers } });
+  const as =
+    (token: string) =>
+    (path: string, init: RequestInit = {}) =>
+      fetch(base + path, { ...init, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...init.headers } });
   const admin = as(ADMIN_TOKEN);
   const ingest = as(INGEST_TOKEN);
   const post = (path: string, body: unknown) => admin(path, { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body) });

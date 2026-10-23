@@ -10,15 +10,32 @@ afterAll(() => app.close());
 
 const json = async (res: Response) => (await res.json()) as any;
 const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
-const lookup = async (...values: string[]) => (await json(await app.ingest("/api/v1/lookup", { method: "POST", body: JSON.stringify({ items: values.map((value) => ({ value })) }) }))).results as any[];
+const lookup = async (...values: string[]) =>
+  (await json(await app.ingest("/api/v1/lookup", { method: "POST", body: JSON.stringify({ items: values.map((value) => ({ value })) }) }))).results as any[];
 
 describe("feeds", () => {
   it("creates feeds with defaults and refuses what is wrong", async () => {
     const res = await app.post("/api/v1/feeds", { name: "Abuse list", kind: "text" });
     expect(res.status).toBe(201);
-    expect(await json(res)).toMatchObject({ name: "Abuse list", kind: "text", defaultTtlDays: 30, defaultConfidence: 50, defaultTlp: "amber", defaultSeverity: "medium", indicators: { total: 0, active: 0 }, lastImportAt: null });
+    expect(await json(res)).toMatchObject({
+      name: "Abuse list",
+      kind: "text",
+      defaultTtlDays: 30,
+      defaultConfidence: 50,
+      defaultTlp: "amber",
+      defaultSeverity: "medium",
+      indicators: { total: 0, active: 0 },
+      lastImportAt: null,
+    });
     expect((await app.post("/api/v1/feeds", { name: "Abuse list", kind: "csv" })).status).toBe(409);
-    for (const bad of [{ name: "x", kind: "rss" }, { name: "-x", kind: "csv" }, { name: "x", kind: "csv", defaultTtlDays: 0 }, { name: "x", kind: "csv", defaultConfidence: 101 }, { name: "x", kind: "csv", defaultTlp: "blue" }, { name: "x", kind: "csv", extra: 1 }]) {
+    for (const bad of [
+      { name: "x", kind: "rss" },
+      { name: "-x", kind: "csv" },
+      { name: "x", kind: "csv", defaultTtlDays: 0 },
+      { name: "x", kind: "csv", defaultConfidence: 101 },
+      { name: "x", kind: "csv", defaultTlp: "blue" },
+      { name: "x", kind: "csv", extra: 1 },
+    ]) {
       expect((await app.post("/api/v1/feeds", bad)).status, JSON.stringify(bad)).toBe(422);
     }
   });
@@ -46,7 +63,14 @@ describe("importing", () => {
     const res = await app.ingest(`/api/v1/feeds/${id}/import`, { method: "POST", body: gzipSync(body), headers: { "content-encoding": "gzip" } });
     expect(res.status).toBe(200);
     const r = await json(res);
-    expect(r).toMatchObject({ feed: { name: "OpenCTI" }, received: 3, created: 3, updated: 0, unparsedCount: 1, unparsed: [{ reason: expect.stringContaining("network-traffic") }] });
+    expect(r).toMatchObject({
+      feed: { name: "OpenCTI" },
+      received: 3,
+      created: 3,
+      updated: 0,
+      unparsedCount: 1,
+      unparsed: [{ reason: expect.stringContaining("network-traffic") }],
+    });
     const [hit, c2, gate] = await lookup("198.51.100.40", "c2.example.org", "https://c2.example.org/gate.php");
     expect(hit).toMatchObject({ verdict: "malicious", confidence: 90, tlp: "amber" });
     expect(c2).toMatchObject({ verdict: "suspicious", confidence: 40 });
@@ -55,9 +79,19 @@ describe("importing", () => {
 
   it("imports a text list and a CSV, and refuses what is not importable", async () => {
     const text = await app.feed("Plain", "text");
-    expect(await json(await app.ingest(`/api/v1/feeds/${text}/import`, { method: "POST", body: "# list\n198.51.100.50\nbad-line\n", headers: { "content-type": "text/plain" } }))).toMatchObject({ created: 1, skippedCount: 1 });
+    expect(
+      await json(
+        await app.ingest(`/api/v1/feeds/${text}/import`, {
+          method: "POST",
+          body: "# list\n198.51.100.50\nbad-line\n",
+          headers: { "content-type": "text/plain" },
+        }),
+      ),
+    ).toMatchObject({ created: 1, skippedCount: 1 });
     const csv = await app.feed("Sheet", "csv");
-    expect(await json(await app.ingest(`/api/v1/feeds/${csv}/import`, { method: "POST", body: "value,confidence\n198.51.100.51,75\n" }))).toMatchObject({ created: 1 });
+    expect(await json(await app.ingest(`/api/v1/feeds/${csv}/import`, { method: "POST", body: "value,confidence\n198.51.100.51,75\n" }))).toMatchObject({
+      created: 1,
+    });
     expect((await lookup("198.51.100.51"))[0]).toMatchObject({ verdict: "malicious", confidence: 75 });
     const manual = await app.feed("By hand", "manual");
     expect((await app.ingest(`/api/v1/feeds/${manual}/import`, { method: "POST", body: "198.51.100.52" })).status).toBe(409);
@@ -70,10 +104,23 @@ describe("importing", () => {
 describe("indicators", () => {
   it("adds one by hand, finds it, lists it with filters and deletes it", async () => {
     const feed = await app.feed("Analysts", "manual", { defaultConfidence: 65 });
-    const res = await app.post("/api/v1/indicators", { feed, value: "hxxp://phish[.]example.com/login", labels: ["phishing"], description: "Seen in a ticket", validUntil: inDays(10) });
+    const res = await app.post("/api/v1/indicators", {
+      feed,
+      value: "hxxp://phish[.]example.com/login",
+      labels: ["phishing"],
+      description: "Seen in a ticket",
+      validUntil: inDays(10),
+    });
     expect(res.status).toBe(201);
     const ind = await json(res);
-    expect(ind).toMatchObject({ type: "url", value: "http://phish.example.com/login", confidence: 65, active: true, labels: ["phishing"], feed: { name: "Analysts" } });
+    expect(ind).toMatchObject({
+      type: "url",
+      value: "http://phish.example.com/login",
+      confidence: 65,
+      active: true,
+      labels: ["phishing"],
+      feed: { name: "Analysts" },
+    });
     expect((await lookup("http://phish.example.com/login"))[0].verdict).toBe("malicious");
     expect((await json(await app.admin(`/api/v1/indicators/${ind.id}`))).value).toBe(ind.value);
     const list = (q: string) => app.admin(`/api/v1/indicators?${q}`).then(json);
@@ -81,7 +128,8 @@ describe("indicators", () => {
     expect((await list(`feed=${feed}&q=phish`)).indicators).toHaveLength(1);
     expect((await list("q=%25")).indicators).toEqual([]);
     expect((await list("limit=1")).nextCursor).toBeDefined();
-    for (const q of ["type=nope", "tlp=blue", "severity=urgent", "status=gone", "limit=0", "cursor=junk"]) expect((await app.admin(`/api/v1/indicators?${q}`)).status, q).toBe(422);
+    for (const q of ["type=nope", "tlp=blue", "severity=urgent", "status=gone", "limit=0", "cursor=junk"])
+      expect((await app.admin(`/api/v1/indicators?${q}`)).status, q).toBe(422);
     expect((await app.admin(`/api/v1/indicators/${ind.id}`, { method: "DELETE" })).status).toBe(204);
     expect((await app.admin(`/api/v1/indicators/${ind.id}`)).status).toBe(404);
   });
@@ -110,7 +158,13 @@ describe("lookup", () => {
     const f = await app.feed("Lookups", "manual");
     await app.post("/api/v1/indicators", { feed: f, value: "198.51.100.0/24", confidence: 80, severity: "high" });
     const one = await json(await app.ingest("/api/v1/lookup?value=198.51.100.99"));
-    expect(one).toMatchObject({ type: "ipv4", value: "198.51.100.99", verdict: "malicious", severity: "high", matches: [{ via: "cidr", value: "198.51.100.0/24" }] });
+    expect(one).toMatchObject({
+      type: "ipv4",
+      value: "198.51.100.99",
+      verdict: "malicious",
+      severity: "high",
+      matches: [{ via: "cidr", value: "198.51.100.0/24" }],
+    });
     expect((await json(await app.ingest("/api/v1/lookup?value=203.0.113.1&type=ipv4"))).verdict).toBe("unknown");
     const many = await lookup("198.51.100.1", "203.0.113.2", "Example.COM.");
     expect(many.map((r) => r.verdict)).toEqual(["malicious", "unknown", "unknown"]);
@@ -147,7 +201,12 @@ describe("allow list", () => {
     expect((await lookup("198.51.100.1"))[0]).toMatchObject({ verdict: "allowed", allowed: { reason: "Our own egress addresses" } });
     expect((await lookup("198.51.100.200"))[0].verdict).toBe("malicious");
     expect((await json(await app.admin("/api/v1/allow-list"))).entries).toHaveLength(1);
-    for (const bad of [{ value: "198.51.100.0/25", reason: "again", expiresAt: inDays(5) }, { value: "198.51.100.9", reason: "", expiresAt: inDays(5) }, { value: "198.51.100.9", reason: "fine", expiresAt: inDays(-1) }, { value: "198.51.100.9", reason: "fine" }]) {
+    for (const bad of [
+      { value: "198.51.100.0/25", reason: "again", expiresAt: inDays(5) },
+      { value: "198.51.100.9", reason: "", expiresAt: inDays(5) },
+      { value: "198.51.100.9", reason: "fine", expiresAt: inDays(-1) },
+      { value: "198.51.100.9", reason: "fine" },
+    ]) {
       expect((await app.post("/api/v1/allow-list", bad)).status, JSON.stringify(bad)).toBeGreaterThanOrEqual(409);
     }
     expect((await app.admin(`/api/v1/allow-list/${entry.id}`, { method: "DELETE" })).status).toBe(204);
@@ -158,7 +217,15 @@ describe("allow list", () => {
 
 describe("access", () => {
   it("lets the ingest token import and look up, and nothing else", async () => {
-    for (const [method, path] of [["GET", "/api/v1/feeds"], ["GET", "/api/v1/indicators"], ["GET", "/api/v1/allow-list"], ["GET", "/api/v1/summary"], ["POST", "/api/v1/feeds"], ["POST", "/api/v1/indicators"], ["POST", "/api/v1/allow-list"]] as const) {
+    for (const [method, path] of [
+      ["GET", "/api/v1/feeds"],
+      ["GET", "/api/v1/indicators"],
+      ["GET", "/api/v1/allow-list"],
+      ["GET", "/api/v1/summary"],
+      ["POST", "/api/v1/feeds"],
+      ["POST", "/api/v1/indicators"],
+      ["POST", "/api/v1/allow-list"],
+    ] as const) {
       expect((await app.ingest(path, { method, body: method === "POST" ? "{}" : undefined })).status, `${method} ${path}`).toBe(401);
     }
     const anon = (path: string, init: RequestInit = {}) => fetch(app.base + path, init);
@@ -171,7 +238,11 @@ describe("access", () => {
   });
 
   it("shows the overview and answers health and version", async () => {
-    expect(await json(await app.admin("/api/v1/summary"))).toMatchObject({ feeds: expect.any(Number), indicators: { active: expect.any(Number) }, lookups: { total: expect.any(Number) } });
+    expect(await json(await app.admin("/api/v1/summary"))).toMatchObject({
+      feeds: expect.any(Number),
+      indicators: { active: expect.any(Number) },
+      lookups: { total: expect.any(Number) },
+    });
     expect(await json(await fetch(`${app.base}/api/v1/version`))).toEqual({ product: "threat-intel", version: "0.1.0" });
     expect((await fetch(`${app.base}/healthz`)).status).toBe(200);
     expect((await fetch(`${app.base}/readyz`)).status).toBe(200);
