@@ -2,7 +2,7 @@
   "openapi": "3.1.1",
   "info": {
     "title": "OpenAsy Threat Intel API",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "summary": "Indicators from STIX, CSV and text feeds, one lookup for the other products, and an allow list with reasons.",
     "description": "Every screen of threat-intel uses this API, and so can your scripts and the other OpenAsy products (ADR 0014). Within `/api/v1` changes are additive only; anything removed is deprecated first (ADR 0024). Errors use Problem Details (RFC 9457).\n\nFeeds import with `THREAT_INTEL_INGEST_TOKEN`, which may also look values up. Everything else takes the session of a signed-in person or an API token, and each operation names the role it needs (`x-openasy-role`: viewer, editor, admin; ADR 0003). TLP:RED indicators are only for editors, admins and the ingest token; for anyone else they do not exist.\n\nSign-in, members and API tokens are under `/api/v1/auth`, provided by [@openasy/auth](https://github.com/openasy/auth#routes).",
     "license": {
