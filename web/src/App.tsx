@@ -1,6 +1,7 @@
 import {
   AppShell,
   Badge,
+  BarList,
   BrandProvider,
   Button,
   Callout,
@@ -23,11 +24,13 @@ import {
   type ProductId,
   useThemePreference,
   useAgo,
+  toLocale,
+  useLocalePreference,
 } from "@openasy/ui";
-import { AccountSettings, AuthGate, MembersSettings, SignInSettings, TokensSettings, useAuth, useInstallBrand } from "@openasy/auth/react";
+import { AccountSettings, AuthGate, MembersSettings, SignInSettings, TokensSettings, useAccountMenu, useAuth, useInstallBrand } from "@openasy/auth/react";
 import colophon from "virtual:openasy-colophon";
-import { KeyRound, ListChecks, LogIn, LogOut, Plus, Rss, Search, Settings2, ShieldCheck, Trash2, Upload, UserRound, Users } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { KeyRound, ListChecks, LogIn, LogOut, Plus, Rss, Search, ShieldCheck, Trash2, Upload, UserRound, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
   INDICATOR_TYPES,
@@ -46,6 +49,7 @@ import {
   type Verdict,
 } from "./api.ts";
 import { useT, type T } from "./i18n.ts";
+import { search } from "./search.ts";
 
 const PAGES = ["indicators", "feeds", "allow-list", "setup", "account", "members", "signin", "tokens", "about"] as const;
 type Route = { page: "lookup" | (typeof PAGES)[number] };
@@ -77,17 +81,17 @@ type Call = ReturnType<typeof useApi>;
 const date = (iso: string) => new Date(iso).toLocaleDateString();
 const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
 
-const TYPE_LABEL: Record<IndicatorType, string> = {
+const TYPE_LABEL = (t: T): Record<IndicatorType, string> => ({
   ipv4: "IPv4",
   ipv6: "IPv6",
-  cidr: "Block",
-  domain: "Domain",
+  cidr: t("indicatorTypes.block"),
+  domain: t("indicatorTypes.domain"),
   url: "URL",
-  email: "Email",
+  email: t("indicatorTypes.email"),
   sha256: "SHA-256",
   sha1: "SHA-1",
   md5: "MD5",
-};
+});
 const TLP_TONE: Record<Tlp, "neutral" | "success" | "warning" | "danger"> = { clear: "neutral", green: "success", amber: "warning", red: "danger" };
 const SEVERITY_TONE: Record<Severity, "critical" | "danger" | "warning" | "info"> = { critical: "critical", high: "danger", medium: "warning", low: "info" };
 const VERDICT_TONE: Record<Verdict, "danger" | "warning" | "neutral" | "success"> = {
@@ -175,10 +179,7 @@ function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
   ];
   return (
     <>
-      <PageHeader
-        title={t("lookupPage.lookUp")}
-        description="Is an address, domain, URL, email address or file hash known to be bad? Defanged values such as hxxp://bad[.]example are read too."
-      />
+      <PageHeader title={t("lookupPage.lookUp")} description={t("lookupPage.isItKnownToBeBad")} />
       {summary && (
         <KpiGrid minWidth={150}>
           <KpiCard label={t("lookupPage.activeIndicators")} value={summary.indicators.active.toLocaleString()} href="/indicators" />
@@ -190,6 +191,16 @@ function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
             footer={t("lookupPage.matchedSinceTheLastStart", { value: summary.lookups.hits.toLocaleString() })}
           />
         </KpiGrid>
+      )}
+      {summary && summary.indicators.active > 0 && (
+        <Panel title={t("lookupPage.indicatorsByType")} description={t("lookupPage.activeOnesFromEveryFeed")}>
+          <BarList
+            label={t("lookupPage.activeIndicatorsByType")}
+            items={INDICATOR_TYPES.filter((type) => summary.byType[type] > 0)
+              .map((type) => ({ id: type, label: TYPE_LABEL(t)[type], value: summary.byType[type], href: `/indicators?type=${type}` }))
+              .sort((a, b) => b.value - a.value)}
+          />
+        </Panel>
       )}
       <Panel>
         <form className="threat-intel-lookup flex flex-wrap items-end gap-2" onSubmit={submit}>
@@ -212,7 +223,7 @@ function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
             <span className="flex flex-wrap items-center gap-2">
               <StatusBadge tone={VERDICT_TONE[r.verdict]}>{VERDICT_LABEL(t)[r.verdict]}</StatusBadge>
               <span className="threat-intel-wrap font-mono">{r.value}</span>
-              <Badge>{TYPE_LABEL[r.type]}</Badge>
+              <Badge>{TYPE_LABEL(t)[r.type]}</Badge>
             </span>
           }
           description={
@@ -310,7 +321,7 @@ function IndicatorDialog({ call, feeds, onClose, onSaved }: { call: Call; feeds:
               label={msg("indicatorDialog.type")}
               value={type}
               onChange={(e) => setType(e.target.value)}
-              options={[{ value: "", label: msg("indicatorDialog.asItLooks") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] }))]}
+              options={[{ value: "", label: msg("indicatorDialog.asItLooks") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL(msg)[t] }))]}
             />
           </div>
           <TextField
@@ -318,7 +329,7 @@ function IndicatorDialog({ call, feeds, onClose, onSaved }: { call: Call; feeds:
             value={value}
             onChange={(e) => setValue(e.target.value)}
             mono
-            hint="Defanged is fine: hxxp://bad[.]example."
+            hint={msg("lookupPage.defangedIsFine")}
           />
           <div className="grid gap-2 sm:grid-cols-2">
             <TextField
@@ -365,7 +376,7 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
   const [next, setNext] = useState<string>();
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [status, setStatus] = useState<"active" | "inactive" | "all">("active");
-  const [type, setType] = useState("");
+  const [type, setType] = useState(new URLSearchParams(window.location.search).get("type") ?? "");
   const [feed, setFeed] = useState(new URLSearchParams(window.location.search).get("feed") ?? "");
   const [q, setQ] = useState("");
   const [adding, setAdding] = useState(false);
@@ -395,7 +406,7 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
     );
 
   const columns: Column<Indicator>[] = [
-    { id: "type", header: msg("indicatorsPage.type"), width: "90px", cell: (i) => <Badge>{TYPE_LABEL[i.type]}</Badge> },
+    { id: "type", header: msg("indicatorsPage.type"), width: "90px", cell: (i) => <Badge>{TYPE_LABEL(msg)[i.type]}</Badge> },
     {
       id: "value",
       header: msg("indicatorsPage.value"),
@@ -466,7 +477,7 @@ function IndicatorsPage({ call, reload }: { call: Call; reload: () => void }) {
           label={msg("indicatorsPage.type")}
           value={type}
           onChange={(e) => setType(e.target.value)}
-          options={[{ value: "", label: msg("indicatorsPage.anyType") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] }))]}
+          options={[{ value: "", label: msg("indicatorsPage.anyType") }, ...INDICATOR_TYPES.map((t) => ({ value: t, label: TYPE_LABEL(msg)[t] }))]}
         />
         <SelectField
           label={msg("indicatorsPage.feed")}
@@ -734,7 +745,7 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
       header: t("feedsPage.active"),
       align: "right",
       sortValue: (f) => f.indicators.active,
-      cell: (f) => `${f.indicators.active.toLocaleString()} of ${f.indicators.total.toLocaleString()}`,
+      cell: (f) => t("feedsPage.activeOfTotal", { active: f.indicators.active.toLocaleString(), total: f.indicators.total.toLocaleString() }),
     },
     {
       id: "defaults",
@@ -917,7 +928,7 @@ function AllowListPage({ call, reload }: { call: Call; reload: () => void }) {
   );
   useEffect(load, [load]);
   const columns: Column<AllowEntry>[] = [
-    { id: "type", header: t("allowListPage.type"), width: "90px", cell: (a) => <Badge>{TYPE_LABEL[a.type]}</Badge> },
+    { id: "type", header: t("allowListPage.type"), width: "90px", cell: (a) => <Badge>{TYPE_LABEL(t)[a.type]}</Badge> },
     {
       id: "value",
       header: t("allowListPage.value"),
@@ -1085,11 +1096,14 @@ function SettingsPage({ page }: { page: "account" | "members" | "signin" | "toke
 function Product() {
   const msg = useT();
   const [theme, setTheme] = useThemePreference();
+  const [, setLocale] = useLocalePreference();
   const { me, can } = useAuth();
+  const account = useAccountMenu();
   const route = parseRoute(usePath());
   const [summary, setSummary] = useState<Summary>();
   const [products, setProducts] = useState<Array<ProductLink & { id: ProductId }>>([]);
   const call = useApi();
+  const onSearch = useMemo(() => search(call, msg), [call, msg]);
 
   // The install's other products (OPENASY_PRODUCTS), for the switcher; ids this UI does not know are left out.
   useEffect(() => {
@@ -1116,7 +1130,6 @@ function Product() {
     { id: "allow-list", label: msg("product.allowList"), icon: ShieldCheck, count: summary?.allowListed || undefined },
   ];
   const footerNav = [
-    { id: "setup", label: msg("product.setup"), icon: Settings2 },
     ...(can("admin")
       ? [
           { id: "members", label: msg("product.members"), icon: Users },
@@ -1131,6 +1144,7 @@ function Product() {
   return (
     <AppShell
       product="threat-intel"
+      onSearch={onSearch}
       about={colophon}
       nav={nav}
       activeNav={route.page}
@@ -1140,15 +1154,17 @@ function Product() {
         const to = products.find((p) => p.id === id);
         if (to) window.location.assign(to.url);
       }}
-      footerNav={footerNav}
-      user={{ name: me.user.name, role: roleName }}
+      footerNav={account.settings(footerNav)}
+      setup
+      user={{ name: me.user.name, role: roleName, ...account.user }}
       theme={theme}
       onThemeChange={setTheme}
+      onLanguageChange={(code) => setLocale(toLocale(code))}
     >
       {route.page === "lookup" ? (
-        <LookupPage call={call} summary={summary} />
+        <LookupPage key={location.search} call={call} summary={summary} />
       ) : route.page === "indicators" ? (
-        <IndicatorsPage call={call} reload={reload} />
+        <IndicatorsPage key={location.search} call={call} reload={reload} />
       ) : route.page === "feeds" ? (
         <FeedsPage call={call} reload={reload} />
       ) : route.page === "allow-list" ? (
@@ -1165,9 +1181,10 @@ function Product() {
 export function App() {
   const installBrand = useInstallBrand();
   const [theme] = useThemePreference();
+  const [locale] = useLocalePreference();
   return (
     // The install's brand from config/brand.env (ADR 0053); OpenAsy's own look where it sets none.
-    <BrandProvider theme={theme} brand={{ name: "OpenAsy", organization: undefined, ...installBrand }} className="min-h-screen">
+    <BrandProvider theme={theme} locale={locale} brand={{ name: "OpenAsy", organization: undefined, ...installBrand }} className="min-h-screen">
       <AuthGate product="OpenAsy Threat Intel">
         <Product />
       </AuthGate>
