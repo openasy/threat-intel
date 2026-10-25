@@ -1272,6 +1272,49 @@
         "x-openasy-role": "viewer"
       }
     },
+    "/api/v1/overview": {
+      "get": {
+        "operationId": "getOverview",
+        "tags": [
+          "Product"
+        ],
+        "summary": "What the overview draws",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Indicators added on each of the last 30 days, the indicators in force by severity and by TLP, how many of them end within 7 days, and every feed with the indicators it has in force and how its scheduled pulls go.\n\nNeeds the viewer role.",
+        "responses": {
+          "200": {
+            "description": "What the overview draws.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "viewer"
+      }
+    },
     "/api/v1/version": {
       "get": {
         "operationId": "getVersion",
@@ -2664,6 +2707,145 @@
             "type": "string",
             "maxLength": 4096,
             "description": "The password for basic or the token for bearer, sealed with openasy-kek. Left out, the saved one is kept while auth and the url's origin stay the same."
+          }
+        }
+      },
+      "Overview": {
+        "type": "object",
+        "required": [
+          "days",
+          "bySeverity",
+          "byTlp",
+          "expiringSoon",
+          "feeds"
+        ],
+        "properties": {
+          "days": {
+            "type": "array",
+            "description": "Oldest first; the last is today (UTC).",
+            "items": {
+              "type": "object",
+              "required": [
+                "day",
+                "added"
+              ],
+              "properties": {
+                "day": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "added": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "bySeverity": {
+            "type": "object",
+            "required": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "properties": {
+              "critical": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "high": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "medium": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "low": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "byTlp": {
+            "type": "object",
+            "required": [
+              "clear",
+              "green",
+              "amber",
+              "red"
+            ],
+            "properties": {
+              "clear": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "green": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "amber": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "red": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "expiringSoon": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "feeds": {
+            "type": "array",
+            "description": "Most indicators in force first.",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "name",
+                "kind",
+                "active",
+                "lastImportAt",
+                "pull"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "active": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "lastImportAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "pull": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "ok",
+                    "failing",
+                    null
+                  ],
+                  "description": "null when the feed is not pulled on a schedule."
+                }
+              }
+            }
           }
         }
       }

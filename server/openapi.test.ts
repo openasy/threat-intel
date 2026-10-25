@@ -209,6 +209,7 @@ describe("responses match openapi.json", () => {
     await call("GET", "/api/v1/allow-list", admin());
     await call("GET", "/api/v1/allow-list", admin(), "/api/v1/allow-list?limit=0");
     await call("GET", "/api/v1/summary", admin());
+    await call("GET", "/api/v1/overview", admin());
   });
 
   it("deletes", async () => {

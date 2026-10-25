@@ -116,6 +116,8 @@ export interface Summary {
   byType: Record<IndicatorType, number>;
   allowListed: number;
   lookups: { total: number; hits: number };
+  /** Feeds pulled on a schedule whose last pull worked, and those whose last pull failed. */
+  pulls: { ok: number; failing: number };
 }
 
 export class Unauthorized extends Error {}
@@ -137,4 +139,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(problem.detail ?? `${path}: ${res.status}`);
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+/** What the overview draws besides the summary (GET /api/v1/overview). */
+export interface Overview {
+  /** Indicators added on each of the last 30 days (UTC), oldest first. */
+  days: Array<{ day: string; added: number }>;
+  bySeverity: Record<Severity, number>;
+  byTlp: Record<Tlp, number>;
+  /** Indicators in force that end within 7 days. */
+  expiringSoon: number;
+  /** pull is null for a feed that is not pulled on a schedule. */
+  feeds: Array<{ id: string; name: string; kind: string; active: number; lastImportAt: string | null; pull: "ok" | "failing" | null }>;
 }

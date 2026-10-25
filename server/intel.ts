@@ -698,6 +698,61 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       };
     },
 
+    /**
+     * What the overview draws besides the summary: indicators added on each of the last 30 days, the ones in force
+     * by severity and TLP, how many end within a week, and each feed with what it holds and how its pulls go.
+     */
+    overview() {
+      const at = now();
+      const DAY = 86_400_000;
+      const today = Math.floor(Date.parse(at) / DAY) * DAY;
+      const from = new Date(today - 29 * DAY).toISOString();
+      const added = new Map(
+        (
+          db.prepare("SELECT substr(created_at, 1, 10) AS d, COUNT(*) AS n FROM indicators WHERE created_at >= ? GROUP BY d").all(from) as Array<{
+            d: string;
+            n: number;
+          }>
+        ).map((r) => [r.d, r.n]),
+      );
+      const days = Array.from({ length: 30 }, (_, i) => {
+        const day = new Date(today - (29 - i) * DAY).toISOString().slice(0, 10);
+        return { day, added: added.get(day) ?? 0 };
+      });
+      const ACTIVE = "revoked = 0 AND valid_from <= ? AND valid_until > ?";
+      const bySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+      for (const r of db.prepare(`SELECT severity AS k, COUNT(*) AS n FROM indicators WHERE ${ACTIVE} GROUP BY severity`).all(at, at) as Array<{
+        k: keyof typeof bySeverity;
+        n: number;
+      }>)
+        bySeverity[r.k] = r.n;
+      const byTlp = { clear: 0, green: 0, amber: 0, red: 0 };
+      for (const r of db.prepare(`SELECT tlp AS k, COUNT(*) AS n FROM indicators WHERE ${ACTIVE} GROUP BY tlp`).all(at, at) as Array<{
+        k: keyof typeof byTlp;
+        n: number;
+      }>)
+        byTlp[r.k] = r.n;
+      const week = new Date(Date.parse(at) + 7 * DAY).toISOString();
+      const expiringSoon = (db.prepare(`SELECT COUNT(*) AS n FROM indicators WHERE ${ACTIVE} AND valid_until <= ?`).get(at, at, week) as { n: number }).n;
+      const feeds = (
+        db
+          .prepare(
+            `SELECT f.id, f.name, f.kind, f.last_import_at, p.last_error, p.feed_id AS pulled,
+               (SELECT COUNT(*) FROM indicators i WHERE i.feed_id = f.id AND i.revoked = 0 AND i.valid_from <= ? AND i.valid_until > ?) AS active
+             FROM feeds f LEFT JOIN feed_pulls p ON p.feed_id = f.id ORDER BY active DESC, f.name`,
+          )
+          .all(at, at) as Array<Record<string, any>>
+      ).map((r) => ({
+        id: r.id as string,
+        name: r.name as string,
+        kind: r.kind as string,
+        active: r.active as number,
+        lastImportAt: (r.last_import_at as string | null) ?? null,
+        pull: r.pulled ? ((r.last_error ? "failing" : "ok") as "ok" | "failing") : null,
+      }));
+      return { days, bySeverity, byTlp, expiringSoon, feeds };
+    },
+
     stats: () => ({ lookups, hits }),
 
     purge() {

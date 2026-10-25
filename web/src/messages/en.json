@@ -1,4 +1,24 @@
 {
+  "overviewPage": {
+    "overview": "Overview",
+    "failingPulls": "Failing pulls",
+    "endingSoon": "Ending within 7 days",
+    "added": "Indicators added",
+    "addedDetail": "Indicators added from every feed on each of the last 30 days.",
+    "indicatorsAdded": "Added",
+    "bySeverity": "By severity",
+    "bySeverityDetail": "Indicators in force now.",
+    "inForce": "in force",
+    "byTlp": "By TLP",
+    "byTlpDetail": "Who may see the indicators in force.",
+    "feedsDetail": "Every feed, with the indicators it has in force and how its pulls go.",
+    "kind": "Kind",
+    "lastImport": "Last import",
+    "pull": "Pull",
+    "notPulled": "Not pulled",
+    "pullOk": "Working",
+    "pullFailing": "Failing"
+  },
   "tlpBadge": {
     "tlp": "TLP:{{value}}"
   },
@@ -218,6 +238,7 @@
     "signOut": "Sign out"
   },
   "product": {
+    "overview": "Overview",
     "lookUp": "Look up",
     "indicators": "Indicators",
     "feeds": "Feeds",

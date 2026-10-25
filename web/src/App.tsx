@@ -20,16 +20,39 @@ import {
   Switch,
   TextField,
   usePath,
-  type Column,
-  type ProductId,
   useThemePreference,
   useAgo,
   toLocale,
   useLocalePreference,
+  DonutChart,
+  OverviewGrid,
+  SEVERITY_META,
+  StackedBarChart,
+  TONE_COLORS,
+  type Column,
+  type ProductId,
 } from "@openasy/ui";
 import { AccountSettings, AuthGate, MembersSettings, SignInSettings, TokensSettings, useAccountMenu, useAuth, useInstallBrand } from "@openasy/auth/react";
 import colophon from "virtual:openasy-colophon";
-import { CloudDownload, KeyRound, ListChecks, LogIn, LogOut, Plus, RefreshCw, Rss, Search, ShieldCheck, Trash2, Upload, UserRound, Users } from "lucide-react";
+import {
+  CircleX,
+  CloudDownload,
+  Hourglass,
+  KeyRound,
+  LayoutDashboard,
+  ListChecks,
+  LogIn,
+  LogOut,
+  Plus,
+  RefreshCw,
+  Rss,
+  Search,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  UserRound,
+  Users,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
@@ -49,18 +72,20 @@ import {
   type Summary,
   type Tlp,
   type Verdict,
+  type Overview,
 } from "./api.ts";
 import { useT, type T } from "./i18n.ts";
 import { search } from "./search.ts";
 
 const PAGES = ["indicators", "feeds", "allow-list", "setup", "account", "members", "signin", "tokens", "about"] as const;
-type Route = { page: "lookup" | (typeof PAGES)[number] };
+type Route = { page: "overview" | "lookup" | (typeof PAGES)[number] };
 /** The first path segments that are pages of this UI, for followLinks. */
-export const PATHS = ["lookup", ...PAGES];
+export const PATHS = ["overview", "lookup", ...PAGES];
 function parseRoute(path: string): Route {
   const [page] = path.replace(/^\//, "").split("/");
   if ((PAGES as readonly string[]).includes(page ?? "")) return { page: page as (typeof PAGES)[number] };
-  return { page: "lookup" };
+  if (page === "lookup") return { page: "lookup" };
+  return { page: "overview" };
 }
 
 /** Data loading with the session; when it ends, the sign-in screen comes back. */
@@ -135,7 +160,121 @@ const SEVERITIES = (t: T): Array<{ value: Severity; label: string }> => [
 
 // ---------------------------------------------------------------- Lookup
 
-function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
+function OverviewPage({ call, summary }: { call: Call; summary?: Summary }) {
+  const ago = useAgo();
+  const t = useT();
+  const [o, setO] = useState<Overview>();
+  useEffect(() => void call<Overview>("/api/v1/overview").then(setO, () => {}), [call, summary]);
+  const s = summary;
+  const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  const feedColumns: Column<Overview["feeds"][number]>[] = [
+    { id: "name", header: t("lookupPage.feed"), cell: (f) => <span className="font-medium">{f.name}</span> },
+    { id: "kind", header: t("overviewPage.kind"), width: "110px", cell: (f) => <Badge>{KIND_LABEL(t)[f.kind as FeedKind] ?? f.kind}</Badge> },
+    { id: "active", header: t("lookupPage.activeIndicators"), width: "150px", align: "right", cell: (f) => f.active.toLocaleString() },
+    { id: "import", header: t("overviewPage.lastImport"), width: "130px", cell: (f) => <span className="text-xs">{ago(f.lastImportAt)}</span> },
+    {
+      id: "pull",
+      header: t("overviewPage.pull"),
+      width: "120px",
+      cell: (f) =>
+        f.pull === null ? (
+          <span className="text-xs text-fg-muted">{t("overviewPage.notPulled")}</span>
+        ) : (
+          <StatusBadge tone={f.pull === "ok" ? "success" : "danger"}>{f.pull === "ok" ? t("overviewPage.pullOk") : t("overviewPage.pullFailing")}</StatusBadge>
+        ),
+    },
+  ];
+  return (
+    <>
+      <PageHeader title={t("overviewPage.overview")} description={t("lookupPage.isItKnownToBeBad")} />
+      {s && (
+        <KpiGrid minWidth={150}>
+          <KpiCard
+            label={t("lookupPage.activeIndicators")}
+            value={s.indicators.active.toLocaleString()}
+            icon={ListChecks}
+            trend={o?.days.map((d) => d.added)}
+            href="/indicators"
+          />
+          <KpiCard label={t("lookupPage.feeds")} value={s.feeds} icon={Rss} href="/feeds" />
+          <KpiCard label={t("overviewPage.failingPulls")} value={s.pulls.failing} icon={CircleX} tone={s.pulls.failing ? "danger" : "success"} href="/feeds" />
+          <KpiCard
+            label={t("overviewPage.endingSoon")}
+            value={o?.expiringSoon.toLocaleString() ?? "–"}
+            icon={Hourglass}
+            tone={o?.expiringSoon ? "warning" : undefined}
+          />
+          <KpiCard label={t("lookupPage.allowedValues")} value={s.allowListed} icon={ShieldCheck} href="/allow-list" />
+          <KpiCard
+            label={t("lookupPage.lookups")}
+            value={s.lookups.total.toLocaleString()}
+            icon={Search}
+            footer={t("lookupPage.matchedSinceTheLastStart", { value: s.lookups.hits.toLocaleString() })}
+            href="/lookup"
+          />
+        </KpiGrid>
+      )}
+      {o && (
+        <OverviewGrid>
+          <Panel title={t("overviewPage.added")} description={t("overviewPage.addedDetail")}>
+            <StackedBarChart
+              label={t("overviewPage.added")}
+              categories={o.days.map((d) => day(d.day))}
+              segments={[{ id: "added", name: t("overviewPage.indicatorsAdded") }]}
+              values={o.days.map((d) => [d.added])}
+              height={190}
+              xTicks={6}
+            />
+          </Panel>
+          <Panel title={t("overviewPage.bySeverity")} description={t("overviewPage.bySeverityDetail")}>
+            <DonutChart
+              label={t("overviewPage.bySeverity")}
+              caption={t("overviewPage.inForce")}
+              slices={SEVERITIES(t).map((x) => ({
+                id: x.value,
+                name: x.label,
+                value: o.bySeverity[x.value],
+                color: TONE_COLORS[SEVERITY_META[x.value].tone],
+                href: `/indicators?severity=${x.value}`,
+              }))}
+            />
+          </Panel>
+        </OverviewGrid>
+      )}
+      {s && o && s.indicators.active > 0 && (
+        <OverviewGrid layout="halves">
+          <Panel title={t("lookupPage.indicatorsByType")} description={t("lookupPage.activeOnesFromEveryFeed")}>
+            <BarList
+              label={t("lookupPage.activeIndicatorsByType")}
+              items={INDICATOR_TYPES.filter((type) => s.byType[type] > 0)
+                .map((type) => ({ id: type, label: TYPE_LABEL(t)[type], value: s.byType[type], href: `/indicators?type=${type}` }))
+                .sort((a, b) => b.value - a.value)}
+            />
+          </Panel>
+          <Panel title={t("overviewPage.byTlp")} description={t("overviewPage.byTlpDetail")}>
+            <DonutChart
+              label={t("overviewPage.byTlp")}
+              caption={t("overviewPage.inForce")}
+              slices={[
+                { id: "clear", name: "TLP:CLEAR", value: o.byTlp.clear, color: TONE_COLORS.neutral },
+                { id: "green", name: "TLP:GREEN", value: o.byTlp.green, color: TONE_COLORS.success },
+                { id: "amber", name: "TLP:AMBER", value: o.byTlp.amber, color: TONE_COLORS.warning },
+                { id: "red", name: "TLP:RED", value: o.byTlp.red, color: TONE_COLORS.danger },
+              ]}
+            />
+          </Panel>
+        </OverviewGrid>
+      )}
+      {o && o.feeds.length > 0 && (
+        <Panel title={t("lookupPage.feeds")} description={t("overviewPage.feedsDetail")} flush>
+          <DataTable label={t("lookupPage.feeds")} rows={o.feeds} columns={feedColumns} getRowId={(f) => f.id} />
+        </Panel>
+      )}
+    </>
+  );
+}
+
+function LookupPage({ call }: { call: Call }) {
   const t = useT();
   const [value, setValue] = useState(new URLSearchParams(window.location.search).get("value") ?? "");
   const [result, setResult] = useState<LookupResult>();
@@ -182,28 +321,6 @@ function LookupPage({ call, summary }: { call: Call; summary?: Summary }) {
   return (
     <>
       <PageHeader title={t("lookupPage.lookUp")} description={t("lookupPage.isItKnownToBeBad")} />
-      {summary && (
-        <KpiGrid minWidth={150}>
-          <KpiCard label={t("lookupPage.activeIndicators")} value={summary.indicators.active.toLocaleString()} href="/indicators" />
-          <KpiCard label={t("lookupPage.feeds")} value={summary.feeds} href="/feeds" />
-          <KpiCard label={t("lookupPage.allowedValues")} value={summary.allowListed} href="/allow-list" />
-          <KpiCard
-            label={t("lookupPage.lookups")}
-            value={summary.lookups.total.toLocaleString()}
-            footer={t("lookupPage.matchedSinceTheLastStart", { value: summary.lookups.hits.toLocaleString() })}
-          />
-        </KpiGrid>
-      )}
-      {summary && summary.indicators.active > 0 && (
-        <Panel title={t("lookupPage.indicatorsByType")} description={t("lookupPage.activeOnesFromEveryFeed")}>
-          <BarList
-            label={t("lookupPage.activeIndicatorsByType")}
-            items={INDICATOR_TYPES.filter((type) => summary.byType[type] > 0)
-              .map((type) => ({ id: type, label: TYPE_LABEL(t)[type], value: summary.byType[type], href: `/indicators?type=${type}` }))
-              .sort((a, b) => b.value - a.value)}
-          />
-        </Panel>
-      )}
       <Panel>
         <form className="threat-intel-lookup flex flex-wrap items-end gap-2" onSubmit={submit}>
           <TextField
@@ -1319,6 +1436,7 @@ function Product() {
   }, [reload]);
 
   const nav = [
+    { id: "overview", label: msg("product.overview"), icon: LayoutDashboard },
     { id: "lookup", label: msg("product.lookUp"), icon: Search },
     { id: "indicators", label: msg("product.indicators"), icon: ListChecks, count: summary?.indicators.active },
     { id: "feeds", label: msg("product.feeds"), icon: Rss, count: summary?.feeds },
@@ -1356,8 +1474,10 @@ function Product() {
       onThemeChange={setTheme}
       onLanguageChange={(code) => setLocale(toLocale(code))}
     >
-      {route.page === "lookup" ? (
-        <LookupPage key={location.search} call={call} summary={summary} />
+      {route.page === "overview" ? (
+        <OverviewPage call={call} summary={summary} />
+      ) : route.page === "lookup" ? (
+        <LookupPage key={location.search} call={call} />
       ) : route.page === "indicators" ? (
         <IndicatorsPage key={location.search} call={call} reload={reload} />
       ) : route.page === "feeds" ? (

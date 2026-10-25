@@ -1,4 +1,24 @@
 {
+  "overviewPage": {
+    "overview": "Genel bakış",
+    "failingPulls": "Hatalı çekmeler",
+    "endingSoon": "7 gün içinde bitecek",
+    "added": "Eklenen göstergeler",
+    "addedDetail": "Son 30 günün her birinde tüm kaynaklardan eklenen göstergeler.",
+    "indicatorsAdded": "Eklenen",
+    "bySeverity": "Öneme göre",
+    "bySeverityDetail": "Şu an geçerli göstergeler.",
+    "inForce": "geçerli",
+    "byTlp": "TLP'ye göre",
+    "byTlpDetail": "Geçerli göstergeleri kimin görebileceği.",
+    "feedsDetail": "Her kaynak, geçerli göstergeleri ve çekmelerinin durumuyla.",
+    "kind": "Tür",
+    "lastImport": "Son içe aktarma",
+    "pull": "Çekme",
+    "notPulled": "Çekilmiyor",
+    "pullOk": "Çalışıyor",
+    "pullFailing": "Hatalı"
+  },
   "tlpBadge": {
     "tlp": "TLP:{{value}}"
   },
@@ -218,6 +238,7 @@
     "signOut": "Çıkış yap"
   },
   "product": {
+    "overview": "Genel bakış",
     "lookUp": "Sorgula",
     "indicators": "Göstergeler",
     "feeds": "Beslemeler",

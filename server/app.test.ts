@@ -248,3 +248,28 @@ describe("access", () => {
     expect((await fetch(`${app.base}/readyz`)).status).toBe(200);
   });
 });
+
+describe("the overview", () => {
+  let own: Awaited<ReturnType<typeof startApp>>;
+  beforeAll(async () => {
+    own = await startApp({ version: "0.1.0" });
+  });
+  afterAll(() => own.close());
+
+  it("counts indicators added by day, in force by severity and TLP, and each feed", async () => {
+    const text = await own.feed("Abuse list", "text");
+    await own.feed("Empty", "csv");
+    await own.ingest(`/api/v1/feeds/${text}/import`, { method: "POST", body: "198.51.100.1\n198.51.100.2\nevil.example.com\n" });
+    const o = await json(await own.admin("/api/v1/overview"));
+    expect(o.days).toHaveLength(30);
+    expect(o.days.at(-1).added).toBe(3);
+    expect(o.bySeverity).toEqual({ critical: 0, high: 0, medium: 3, low: 0 });
+    expect(o.byTlp).toEqual({ clear: 0, green: 0, amber: 3, red: 0 });
+    expect(o.expiringSoon).toBe(0);
+    expect(o.feeds.map((f: { name: string; active: number }) => [f.name, f.active])).toEqual([
+      ["Abuse list", 3],
+      ["Empty", 0],
+    ]);
+    expect(o.feeds[0]).toMatchObject({ kind: "text", pull: null, lastImportAt: expect.any(String) });
+  });
+});

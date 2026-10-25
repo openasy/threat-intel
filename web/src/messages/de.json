@@ -1,4 +1,24 @@
 {
+  "overviewPage": {
+    "overview": "Übersicht",
+    "failingPulls": "Fehlerhafte Abrufe",
+    "endingSoon": "Endet in 7 Tagen",
+    "added": "Hinzugefügte Indikatoren",
+    "addedDetail": "An jedem der letzten 30 Tage aus allen Feeds hinzugefügte Indikatoren.",
+    "indicatorsAdded": "Hinzugefügt",
+    "bySeverity": "Nach Schweregrad",
+    "bySeverityDetail": "Jetzt gültige Indikatoren.",
+    "inForce": "gültig",
+    "byTlp": "Nach TLP",
+    "byTlpDetail": "Wer die gültigen Indikatoren sehen darf.",
+    "feedsDetail": "Jeder Feed mit seinen gültigen Indikatoren und wie seine Abrufe laufen.",
+    "kind": "Art",
+    "lastImport": "Letzter Import",
+    "pull": "Abruf",
+    "notPulled": "Nicht abgerufen",
+    "pullOk": "Funktioniert",
+    "pullFailing": "Fehlerhaft"
+  },
   "tlpBadge": {
     "tlp": "TLP:{{value}}"
   },
@@ -218,6 +238,7 @@
     "signOut": "Abmelden"
   },
   "product": {
+    "overview": "Übersicht",
     "lookUp": "Abfragen",
     "indicators": "Indikatoren",
     "feeds": "Feeds",

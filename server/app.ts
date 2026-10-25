@@ -219,6 +219,7 @@ export function createApp({
     { method: "GET", path: "/api/v1/version", auth: "none", handle: () => ({ product: "threat-intel", version }) },
     { method: "GET", path: "/api/v1/products", auth: "viewer", handle: () => ({ products }) },
     { method: "GET", path: "/api/v1/summary", auth: "viewer", handle: () => intel.summary() },
+    { method: "GET", path: "/api/v1/overview", auth: "viewer", handle: () => intel.overview() },
 
     // Feeds: where indicators come from.
     { method: "GET", path: "/api/v1/feeds", auth: "viewer", handle: ({ url }) => page("feeds", intel.listFeeds(cursor(url), limit(url))) },
