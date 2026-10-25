@@ -29,7 +29,7 @@ import {
 } from "@openasy/ui";
 import { AccountSettings, AuthGate, MembersSettings, SignInSettings, TokensSettings, useAccountMenu, useAuth, useInstallBrand } from "@openasy/auth/react";
 import colophon from "virtual:openasy-colophon";
-import { KeyRound, ListChecks, LogIn, LogOut, Plus, Rss, Search, ShieldCheck, Trash2, Upload, UserRound, Users } from "lucide-react";
+import { CloudDownload, KeyRound, ListChecks, LogIn, LogOut, Plus, RefreshCw, Rss, Search, ShieldCheck, Trash2, Upload, UserRound, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   api,
@@ -39,6 +39,8 @@ import {
   type AllowEntry,
   type Feed,
   type FeedKind,
+  type FeedPull,
+  type PullResult,
   type Indicator,
   type IndicatorType,
   type LookupResult,
@@ -705,6 +707,172 @@ function ImportDialog({ call, feed, onClose, onDone }: { call: Call; feed: Feed;
   );
 }
 
+const EVERY = [15, 60, 360, 1440] as const;
+
+/** Where a feed is pulled from on a schedule: a TAXII 2.1 collection for STIX, or a URL that answers with the feed. */
+function PullDialog({ call, feed, onClose, onSaved }: { call: Call; feed: Feed; onClose: () => void; onSaved: () => void }) {
+  const t = useT();
+  const old = feed.pull;
+  const [source, setSource] = useState<FeedPull["source"]>(old?.source ?? (feed.kind === "stix" ? "taxii" : "url"));
+  const [url, setUrl] = useState(old?.url ?? "");
+  const [every, setEvery] = useState(String(old?.everyMinutes ?? 60));
+  const [auth, setAuth] = useState<FeedPull["auth"]>(old?.auth ?? "none");
+  const [username, setUsername] = useState(old?.username ?? "");
+  const [secret, setSecret] = useState("");
+  const [error, setError] = useState<string>();
+  const [result, setResult] = useState<PullResult>();
+  const [busy, setBusy] = useState(false);
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const body = {
+        source,
+        url: url.trim(),
+        everyMinutes: Number(every),
+        auth,
+        ...(auth === "basic" && { username }),
+        ...(auth !== "none" && secret && { secret }),
+      };
+      await call(`/api/v1/feeds/${feed.id}/pull`, { method: "PUT", body: JSON.stringify(body) });
+      // Pull once at once, so a wrong address or password shows here and not an hour later.
+      setResult(await call<PullResult>(`/api/v1/feeds/${feed.id}/pull/run`, { method: "POST" }));
+      setError(undefined);
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+      onSaved();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stop = () =>
+    void call(`/api/v1/feeds/${feed.id}/pull`, { method: "DELETE" }).then(
+      () => (onSaved(), onClose()),
+      (err: Error) => setError(err.message),
+    );
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={t("pullDialog.pull", { name: feed.name })}
+      description={t("pullDialog.whatIsPulledIsImported")}
+      onSubmit={save}
+      footer={
+        <>
+          {old && !result && (
+            <Button type="button" variant="danger" onClick={stop}>
+              {t("pullDialog.stopPulling")}
+            </Button>
+          )}
+          <Button type="button" onClick={onClose}>
+            {result ? t("pullDialog.close") : t("pullDialog.cancel")}
+          </Button>
+          {!result && (
+            <Button type="submit" variant="primary" icon={<CloudDownload />} disabled={!url.trim() || busy}>
+              {t("pullDialog.saveAndPull")}
+            </Button>
+          )}
+        </>
+      }
+    >
+      {result ? (
+        <PullSummary result={result} />
+      ) : (
+        <>
+          {feed.kind === "stix" && (
+            <SegmentedControl
+              label={t("pullDialog.from")}
+              value={source}
+              onChange={(v) => setSource(v as FeedPull["source"])}
+              options={[
+                { value: "taxii", label: t("pullDialog.taxiiCollection") },
+                { value: "url", label: t("pullDialog.aUrl") },
+              ]}
+            />
+          )}
+          <TextField
+            label={source === "taxii" ? t("pullDialog.collectionUrl") : "URL"}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            hint={source === "taxii" ? t("pullDialog.suchAsTaxii") : t("pullDialog.suchAsUrl")}
+          />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <SelectField
+              label={t("pullDialog.every")}
+              value={every}
+              onChange={(e) => setEvery(e.target.value)}
+              options={EVERY.map((m) => ({ value: String(m), label: t(`pullDialog.every${m}`) }))}
+            />
+            <SelectField
+              label={t("pullDialog.signIn")}
+              value={auth}
+              onChange={(e) => setAuth(e.target.value as FeedPull["auth"])}
+              options={[
+                { value: "none", label: t("pullDialog.none") },
+                { value: "basic", label: t("pullDialog.basic") },
+                { value: "bearer", label: t("pullDialog.bearer") },
+              ]}
+            />
+          </div>
+          {auth !== "none" && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {auth === "basic" && (
+                <TextField label={t("pullDialog.username")} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />
+              )}
+              <TextField
+                label={auth === "basic" ? t("pullDialog.password") : t("pullDialog.token")}
+                type="password"
+                value={secret}
+                onChange={(e) => setSecret(e.target.value)}
+                autoComplete="new-password"
+                hint={old?.auth === auth ? t("pullDialog.leaveEmptyToKeep") : t("pullDialog.sealedWithKek")}
+              />
+            </div>
+          )}
+          {error && <p className="m-0 text-xs text-danger">{error}</p>}
+        </>
+      )}
+    </Dialog>
+  );
+}
+
+function PullSummary({ result }: { result: PullResult }) {
+  const t = useT();
+  return (
+    <>
+      <p className="m-0 text-sm">
+        {t("pullDialog.read", { received: result.received, created: result.created, updated: result.updated })}
+        {result.revoked ? t("importDialog.revoked", { revoked: result.revoked }) : ""}.
+      </p>
+      {result.leftOut > 0 && (
+        <Callout tone="warning" title={t("importDialog.leftOut", { value: result.leftOut })}>
+          {t("pullDialog.leftOutText")}
+        </Callout>
+      )}
+      {result.more && <p className="m-0 text-xs text-fg-muted">{t("pullDialog.more")}</p>}
+    </>
+  );
+}
+
+/** When the feed was last pulled, and whether it worked. */
+function PullStatus({ pull }: { pull: FeedPull }) {
+  const t = useT();
+  const ago = useAgo();
+  return (
+    <span className="flex flex-col gap-0.5 text-xs">
+      {pull.lastError ? (
+        <StatusBadge tone="danger">{t("feedsPage.pullFailed")}</StatusBadge>
+      ) : (
+        <span className="whitespace-nowrap text-fg-muted">
+          {pull.lastSuccessAt ? t("feedsPage.pulled", { value: ago(pull.lastSuccessAt) }) : t("feedsPage.notPulledYet")}
+        </span>
+      )}
+      {pull.lastError && <span className="threat-intel-wrap text-fg-muted">{pull.lastError}</span>}
+    </span>
+  );
+}
+
 function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
   const ago = useAgo();
   const t = useT();
@@ -714,6 +882,8 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
   const [editing, setEditing] = useState<Feed>();
   const [importing, setImporting] = useState<Feed>();
   const [removing, setRemoving] = useState<Feed>();
+  const [pulling, setPulling] = useState<Feed>();
+  const [running, setRunning] = useState<string>();
   const load = useCallback(
     () =>
       void call<{ feeds: Feed[] }>("/api/v1/feeds?limit=500").then(
@@ -761,15 +931,39 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
       id: "last",
       header: t("feedsPage.lastImport"),
       sortValue: (f) => f.lastImportAt ?? "",
-      cell: (f) => <span className="whitespace-nowrap text-xs">{f.kind === "manual" ? "–" : ago(f.lastImportAt)}</span>,
+      cell: (f) => (
+        <span className="flex flex-col gap-1">
+          <span className="whitespace-nowrap text-xs">{f.kind === "manual" ? "–" : ago(f.lastImportAt)}</span>
+          {f.pull && <PullStatus pull={f.pull} />}
+        </span>
+      ),
     },
     {
       id: "actions",
       header: "",
       align: "right",
-      width: "200px",
+      width: "260px",
       cell: (f) => (
         <span className="flex justify-end gap-1">
+          {can("editor") && f.pull && (
+            <Button
+              size="sm"
+              icon={<RefreshCw />}
+              aria-label={t("feedsPage.pullNow", { name: f.name })}
+              disabled={running === f.id}
+              onClick={() => {
+                setRunning(f.id);
+                void call(`/api/v1/feeds/${f.id}/pull/run`, { method: "POST" })
+                  .catch(() => {})
+                  .finally(() => (setRunning(undefined), load(), reload()));
+              }}
+            />
+          )}
+          {can("admin") && f.kind !== "manual" && (
+            <Button size="sm" icon={<CloudDownload />} onClick={() => setPulling(f)}>
+              {t("feedsPage.pull")}
+            </Button>
+          )}
           {can("editor") && f.kind !== "manual" && (
             <Button size="sm" icon={<Upload />} onClick={() => setImporting(f)}>
               {t("feedsPage.import")}
@@ -827,6 +1021,7 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
         />
       )}
       {importing && <ImportDialog call={call} feed={importing} onClose={() => setImporting(undefined)} onDone={() => (load(), reload())} />}
+      {pulling && <PullDialog call={call} feed={pulling} onClose={() => setPulling(undefined)} onSaved={() => (load(), reload())} />}
       {removing && (
         <Dialog
           open

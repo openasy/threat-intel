@@ -28,7 +28,31 @@ export interface Feed {
   defaultSeverity: Severity;
   lastImportAt: string | null;
   indicators: { total: number; active: number };
+  /** Where the feed is pulled from on a schedule, or null when it is only sent. */
+  pull: FeedPull | null;
   createdAt: string;
+}
+
+export interface PullResult {
+  received: number;
+  created: number;
+  updated: number;
+  revoked: number;
+  leftOut: number;
+  more: boolean;
+}
+
+export interface FeedPull {
+  source: "taxii" | "url";
+  url: string;
+  auth: "none" | "basic" | "bearer";
+  username: string | null;
+  everyMinutes: number;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+  lastResult: PullResult | null;
+  nextAt: string;
 }
 
 export interface Indicator {

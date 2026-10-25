@@ -6,6 +6,8 @@ import { openDb } from "./db.ts";
 import { log } from "./log.ts";
 import { parseProducts } from "./products.ts";
 import { createIntel } from "./intel.ts";
+import { createKeyring } from "./kek.ts";
+import { createPuller } from "./pull.ts";
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
 const port = Number(process.env.PORT ?? 8080);
@@ -24,6 +26,7 @@ const db = openDb(dbPath);
 // The address people open threat-intel at, behind the TLS proxy (ADR 0026). Cookies, passkeys and OIDC redirects use it.
 const publicUrl = (process.env.THREAT_INTEL_PUBLIC_URL ?? `http://localhost:${port}`).replace(/\/$/, "");
 const secretsKeyFile = process.env.THREAT_INTEL_SECRETS_KEY_FILE ?? "/run/secrets/openasy-kek";
+const secretsKey = readSecretsKey(secretsKeyFile);
 const auth = createAuth({
   db,
   product: "threat-intel",
@@ -33,11 +36,13 @@ const auth = createAuth({
   trustedOrigins: publicUrl.startsWith("http://localhost:") ? [publicUrl.replace("localhost", "127.0.0.1")] : [],
   passwords: process.env.THREAT_INTEL_PASSWORD_SIGN_IN !== "false",
   oidc: oidcFromEnv(process.env, "THREAT_INTEL_"),
-  secretsKey: readSecretsKey(secretsKeyFile),
+  secretsKey,
   // Audit log (ADR 0013): every sign-in, failure and change to members and tokens.
   onEvent: (event) => log(event.type === "sign-in-failed" ? "warn" : "info", "auth", { event }),
 });
 const intel = createIntel(db, { retentionDays });
+// Feeds pulled from TAXII collections and URLs (ADR 0050); their passwords and tokens are sealed with openasy-kek.
+const puller = createPuller({ db, intel, keyring: secretsKey ? createKeyring(secretsKey) : undefined, version, log });
 const products = parseProducts(process.env.OPENASY_PRODUCTS);
 if (products.invalid.length) log("warn", "OPENASY_PRODUCTS: left out entries that are not id=https://address", { entries: products.invalid });
 const server = createServer(
@@ -52,6 +57,7 @@ const server = createServer(
     openapi,
     serveMetrics: metricsPort === undefined,
     products: products.products,
+    puller,
   }),
 );
 const metricsServer = metricsPort !== undefined ? createServer(createMetricsHandler(intel, version)) : undefined;
@@ -75,7 +81,11 @@ const setup = auth.setupLink();
 if (setup) log("info", "no owner yet: open this link once to create the owner account", { url: setup });
 
 intel.purge();
-const timers: NodeJS.Timeout[] = [setInterval(() => auth.purge(), 5 * 60_000), setInterval(() => intel.purge(), 24 * 3_600_000)];
+const timers: NodeJS.Timeout[] = [
+  setInterval(() => auth.purge(), 5 * 60_000),
+  setInterval(() => intel.purge(), 24 * 3_600_000),
+  setInterval(() => void puller.tick(), 60_000),
+];
 
 function shutdown(signal: string) {
   log("info", "shutting down", { signal });

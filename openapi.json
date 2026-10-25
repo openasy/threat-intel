@@ -433,6 +433,196 @@
         "x-openasy-role": "editor"
       }
     },
+    "/api/v1/feeds/{id}/pull": {
+      "put": {
+        "operationId": "setFeedPull",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Pull a feed on a schedule",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Threat Intel fetches the feed itself, every `everyMinutes`, and imports it as if it were sent: a stix feed from a TAXII 2.1 collection (only objects added since the last pull) or from a URL with a bundle; a csv or text feed from a URL. A manual feed is not pulled. This is the only outbound call threat-intel makes.\n\nNeeds the admin role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPull"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where the feed is pulled from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPull"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "admin"
+      },
+      "delete": {
+        "operationId": "deleteFeedPull",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Stop pulling a feed",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Its indicators stay, and expire as usual.\n\nNeeds the admin role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No longer pulled."
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "admin"
+      }
+    },
+    "/api/v1/feeds/{id}/pull/run": {
+      "post": {
+        "operationId": "runFeedPull",
+        "tags": [
+          "Feeds"
+        ],
+        "summary": "Pull a feed now",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiToken": []
+          },
+          {
+            "adminToken": []
+          }
+        ],
+        "description": "Pulls at once instead of waiting for the schedule. A failed pull answers 502 with the reason, which the feed keeps in `pull.lastError`.\n\nNeeds the editor role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "The feed's id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What the pull read and stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "403": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "404": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "409": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "422": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "502": {
+            "$ref": "#/components/responses/Problem"
+          },
+          "503": {
+            "$ref": "#/components/responses/Problem"
+          }
+        },
+        "x-openasy-role": "editor"
+      }
+    },
     "/api/v1/indicators": {
       "get": {
         "operationId": "listIndicators",
@@ -1292,6 +1482,7 @@
               "not-found",
               "not-configured",
               "payload-too-large",
+              "pull-failed",
               "internal-error",
               "unauthenticated",
               "invalid-credentials",
@@ -1454,6 +1645,7 @@
           "defaultSeverity",
           "lastImportAt",
           "indicators",
+          "pull",
           "createdAt"
         ],
         "additionalProperties": false,
@@ -1508,6 +1700,16 @@
                 "type": "integer"
               }
             }
+          },
+          "pull": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FeedPull"
+              }
+            ]
           },
           "createdAt": {
             "type": "string",
@@ -2178,7 +2380,8 @@
           "indicators",
           "byType",
           "allowListed",
-          "lookups"
+          "lookups",
+          "pulls"
         ],
         "additionalProperties": false,
         "properties": {
@@ -2267,6 +2470,200 @@
               }
             },
             "description": "Since the process started."
+          },
+          "pulls": {
+            "type": "object",
+            "required": [
+              "ok",
+              "failing"
+            ],
+            "additionalProperties": false,
+            "description": "Feeds pulled on a schedule, by whether their last pull worked.",
+            "properties": {
+              "ok": {
+                "type": "integer"
+              },
+              "failing": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "PullResult": {
+        "type": "object",
+        "required": [
+          "received",
+          "created",
+          "updated",
+          "revoked",
+          "leftOut",
+          "more"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "received": {
+            "type": "integer"
+          },
+          "created": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "revoked": {
+            "type": "integer"
+          },
+          "leftOut": {
+            "type": "integer",
+            "description": "Entries that could not be read and were left out."
+          },
+          "more": {
+            "type": "boolean",
+            "description": "The TAXII collection had more than one pull reads (20 pages); the rest is pulled at the next minute."
+          }
+        }
+      },
+      "FeedPull": {
+        "type": "object",
+        "required": [
+          "source",
+          "url",
+          "auth",
+          "username",
+          "everyMinutes",
+          "lastAttemptAt",
+          "lastSuccessAt",
+          "lastError",
+          "lastResult",
+          "nextAt"
+        ],
+        "additionalProperties": false,
+        "description": "Where the feed is pulled from on a schedule. The password or token is never shown.",
+        "properties": {
+          "source": {
+            "enum": [
+              "taxii",
+              "url"
+            ],
+            "description": "`taxii`: a TAXII 2.1 collection, read from where the last pull stopped. `url`: a document in the feed's kind, read whole each time."
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "auth": {
+            "enum": [
+              "none",
+              "basic",
+              "bearer"
+            ]
+          },
+          "username": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "everyMinutes": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 10080
+          },
+          "lastAttemptAt": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          },
+          "lastSuccessAt": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          },
+          "lastError": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "lastResult": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PullResult"
+              }
+            ]
+          },
+          "nextAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SetPull": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "https://, or http:// for a feed that needs no password or token. For TAXII, the collection, such as https://taxii.example.com/api1/collections/91a7b528-80eb-42ed-a74d-c6fbd5a26116/."
+          },
+          "source": {
+            "enum": [
+              "taxii",
+              "url"
+            ],
+            "description": "`taxii` only for a stix feed, and its default; `url` for the others."
+          },
+          "everyMinutes": {
+            "type": "integer",
+            "minimum": 15,
+            "maximum": 10080,
+            "default": 60
+          },
+          "auth": {
+            "enum": [
+              "none",
+              "basic",
+              "bearer"
+            ],
+            "default": "none"
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "For basic."
+          },
+          "secret": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "The password for basic or the token for bearer, sealed with openasy-kek. Left out, the saved one is kept while auth and the url's origin stay the same."
           }
         }
       }

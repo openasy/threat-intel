@@ -1,10 +1,13 @@
 // Starts the app on a random port for tests.
+import { randomBytes } from "node:crypto";
 import { createServer, type RequestListener, type Server } from "node:http";
 import { createAuth } from "@openasy/auth";
 import type { AddressInfo } from "node:net";
 import { createApp, type AppOptions } from "./app.ts";
 import { openDb } from "./db.ts";
 import { createIntel } from "./intel.ts";
+import { createKeyring } from "./kek.ts";
+import { createPuller } from "./pull.ts";
 
 export const INGEST_TOKEN = "test-ingest-token";
 export const ADMIN_TOKEN = "test-admin-token";
@@ -55,16 +58,17 @@ export function bundle(...indicators: TestIndicator[]) {
   });
 }
 
-export async function startApp(opts: Partial<AppOptions> & { version: string }) {
+export async function startApp({ pullFetch, ...opts }: Partial<AppOptions> & { version: string; pullFetch?: typeof fetch }) {
   const db = openDb(":memory:");
   const intel = createIntel(db);
+  const puller = createPuller({ db, intel, keyring: createKeyring(randomBytes(32)), version: opts.version, log: () => {}, fetch: pullFetch });
   // The origin is known once the port is, so the handler is set after listening.
   let handler: RequestListener = (_req, res) => res.writeHead(503).end();
   const server: Server = createServer((req, res) => handler(req, res));
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const base = `http://localhost:${(server.address() as AddressInfo).port}`;
   const auth = createAuth({ db, product: "threat-intel", productName: "OpenAsy Threat Intel", origin: base });
-  handler = createApp({ db, intel, auth, ingestToken: INGEST_TOKEN, adminToken: ADMIN_TOKEN, ...opts });
+  handler = createApp({ db, intel, auth, ingestToken: INGEST_TOKEN, adminToken: ADMIN_TOKEN, puller, ...opts });
   const as =
     (token: string) =>
     (path: string, init: RequestInit = {}) =>
@@ -75,5 +79,5 @@ export async function startApp(opts: Partial<AppOptions> & { version: string }) 
   const feed = async (name: string, kind: "stix" | "csv" | "text" | "manual", extra: Record<string, unknown> = {}) =>
     ((await (await post("/api/v1/feeds", { name, kind, ...extra })).json()) as { id: string }).id;
   const close = () => new Promise<void>((resolve) => server.close(() => resolve()));
-  return { db, intel, auth, base, admin, ingest, post, feed, close };
+  return { db, intel, puller, auth, base, admin, ingest, post, feed, close };
 }

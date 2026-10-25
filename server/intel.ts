@@ -2,10 +2,20 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import type { Role } from "@openasy/auth";
 import { detectType, networksContaining, NormalizeError, normalizeIndicator, TYPES, type IndicatorType } from "./normalize.ts";
+import { presentPull } from "./pull.ts";
 import { parseStixPattern, StixPatternError } from "./stix.ts";
 
 export type ProblemCode =
-  "invalid-token" | "invalid-json" | "invalid-body" | "invalid-import" | "not-found" | "conflict" | "not-configured" | "payload-too-large" | "internal-error";
+  | "invalid-token"
+  | "invalid-json"
+  | "invalid-body"
+  | "invalid-import"
+  | "not-found"
+  | "conflict"
+  | "not-configured"
+  | "payload-too-large"
+  | "pull-failed"
+  | "internal-error";
 
 export class IntelError extends Error {
   readonly status: number;
@@ -204,6 +214,7 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
       defaultSeverity: f.default_severity as Severity,
       lastImportAt: (f.last_import_at as string | null) ?? null,
       indicators: { total, active },
+      pull: presentPull(db, f.id as string),
       createdAt: f.created_at as string,
     };
   }
@@ -680,6 +691,10 @@ export function createIntel(db: DatabaseSync, { retentionDays = 365 }: IntelOpti
         byType,
         allowListed: (db.prepare("SELECT COUNT(*) AS n FROM allow_list WHERE expires_at > ?").get(at) as { n: number }).n,
         lookups: { total: lookups, hits },
+        // Feeds pulled on a schedule whose last pull worked, and those whose last pull failed.
+        pulls: db
+          .prepare("SELECT COUNT(*) FILTER (WHERE last_error IS NULL) AS ok, COUNT(*) FILTER (WHERE last_error IS NOT NULL) AS failing FROM feed_pulls")
+          .get() as { ok: number; failing: number },
       };
     },
 

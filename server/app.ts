@@ -8,6 +8,7 @@ import { AuthError, identityOrigin, mergeOpenApi, sendProblem, type Auth, type R
 import { log } from "./log.ts";
 import { countRequest, renderMetrics } from "./metrics.ts";
 import type { ProductLink } from "./products.ts";
+import type { Puller } from "./pull.ts";
 import { IntelError, parseLimit, type Caller, type Intel, type ProblemCode } from "./intel.ts";
 
 export interface AppOptions {
@@ -30,6 +31,8 @@ export interface AppOptions {
   serveMetrics?: boolean;
   /** The install's OpenAsy products and their addresses, from OPENASY_PRODUCTS, for the product switcher. */
   products?: ProductLink[];
+  /** Pulls feeds from TAXII collections and URLs; without it the pull routes answer 503. */
+  puller?: Puller;
 }
 
 function metricsText(intel: Intel, version: string) {
@@ -41,6 +44,7 @@ function metricsText(intel: Intel, version: string) {
     allowListed: s.allowListed,
     lookups: s.lookups.total,
     hits: s.lookups.hits,
+    pulls: s.pulls,
   });
 }
 
@@ -93,6 +97,7 @@ const TITLES: Record<ProblemCode, string> = {
   conflict: "Conflict",
   "not-configured": "Not configured",
   "payload-too-large": "Payload too large",
+  "pull-failed": "Pull failed",
   "internal-error": "Internal error",
 };
 
@@ -181,7 +186,20 @@ const query = (url: URL, name: string, max = 128) => {
   return v || undefined;
 };
 
-export function createApp({ db, intel, version, auth, adminToken, ingestToken, webDir, docsDir, openapi, serveMetrics = true, products = [] }: AppOptions) {
+export function createApp({
+  db,
+  intel,
+  version,
+  auth,
+  adminToken,
+  ingestToken,
+  webDir,
+  docsDir,
+  openapi,
+  serveMetrics = true,
+  products = [],
+  puller,
+}: AppOptions) {
   // The served description includes /api/v1/auth from @openasy/auth, so the API reference documents sign-in too.
   const spec = openapi && JSON.stringify({ ...mergeOpenApi(openapi), info: { ...(openapi.info as object), version } });
   const noContent = (res: ServerResponse) => {
@@ -191,6 +209,11 @@ export function createApp({ db, intel, version, auth, adminToken, ingestToken, w
   const limit = (url: URL) => parseLimit(url.searchParams.get("limit"));
   const page = <K extends string, T>(key: K, p: { items: T[]; nextCursor?: string }) =>
     ({ [key]: p.items, ...(p.nextCursor && { nextCursor: p.nextCursor }) }) as Record<K, T[]> & { nextCursor?: string };
+
+  const pulls = () => {
+    if (!puller) throw new IntelError(503, "not-configured", "Pulling feeds is not set up on this threat-intel.");
+    return puller;
+  };
 
   const routes: Route[] = [
     { method: "GET", path: "/api/v1/version", auth: "none", handle: () => ({ product: "threat-intel", version }) },
@@ -210,6 +233,10 @@ export function createApp({ db, intel, version, auth, adminToken, ingestToken, w
       auth: "ingest",
       handle: async ({ req, params }) => intel.importFeed(params[0]!, await readBody(req, IMPORT_LIMIT)),
     },
+    // Where a feed is pulled from on a schedule: a TAXII 2.1 collection, or a URL that answers with the feed.
+    { method: "PUT", path: "/api/v1/feeds/:id/pull", auth: "admin", handle: async ({ params, body }) => pulls().set(params[0]!, await body()) },
+    { method: "DELETE", path: "/api/v1/feeds/:id/pull", auth: "admin", handle: ({ res, params }) => (pulls().remove(params[0]!), noContent(res)) },
+    { method: "POST", path: "/api/v1/feeds/:id/pull/run", auth: "editor", handle: ({ params }) => pulls().run(params[0]!) },
 
     // Indicators.
     {

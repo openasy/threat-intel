@@ -15,6 +15,8 @@ export interface Gauges {
   /** Values looked up since the process started, and how many of them matched an indicator. */
   lookups: number;
   hits: number;
+  /** Feeds pulled on a schedule, by whether their last pull worked. */
+  pulls: { ok: number; failing: number };
 }
 
 export function renderMetrics(version: string, g: Gauges): string {
@@ -40,6 +42,10 @@ export function renderMetrics(version: string, g: Gauges): string {
     "# HELP openasy_threat_intel_lookup_hits_total Looked-up values that matched an active indicator.",
     "# TYPE openasy_threat_intel_lookup_hits_total counter",
     `openasy_threat_intel_lookup_hits_total ${g.hits}`,
+    "# HELP openasy_threat_intel_feed_pulls Feeds pulled on a schedule, by whether their last pull worked.",
+    "# TYPE openasy_threat_intel_feed_pulls gauge",
+    `openasy_threat_intel_feed_pulls{state="ok"} ${g.pulls.ok}`,
+    `openasy_threat_intel_feed_pulls{state="failing"} ${g.pulls.failing}`,
     "# HELP process_uptime_seconds Seconds since the process started.",
     "# TYPE process_uptime_seconds gauge",
     `process_uptime_seconds ${process.uptime().toFixed(0)}`,

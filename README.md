@@ -38,6 +38,28 @@ curl -sf -X POST -H "Authorization: Bearer $THREAT_INTEL_INGEST_TOKEN" --data-bi
   https://intel.example.com/api/v1/feeds/<feed id>/import
 ```
 
+### Pulled on a schedule
+
+A feed can instead be **pulled** by threat-intel itself, every 15 minutes to once a week (under Feeds, Pull, or
+`PUT /api/v1/feeds/{id}/pull`). What it pulls goes through the same import, so nothing is dropped without a word.
+
+- A `stix` feed reads a **TAXII 2.1 collection**, such as OpenCTI's or MISP's: only the objects added since the last
+  pull, page by page, from where the server says the last page stopped. A collection with more than 20 pages carries on
+  at the next minute.
+- Any feed but a manual one can read a **URL** that answers with the feed in its kind, such as a blocklist. It is read
+  whole each time; values it no longer lists end when their validity does.
+- Basic sign-in or a bearer token is sent over `https://` only, kept sealed with `openasy-kek`, and never shown again.
+  Left out on a change, the saved one is kept while the address stays on the same origin.
+- A failed pull keeps its reason on the feed and in `/metrics`, and is tried again at its next time.
+
+Pulling is the only outbound call threat-intel makes, and only to the addresses an admin sets.
+
+```bash
+curl -sf -X PUT -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+  -d '{"url": "https://taxii.example.com/api1/collections/91a7b528-80eb-42ed-a74d-c6fbd5a26116/", "auth": "basic", "username": "openasy", "secret": "...", "everyMinutes": 60}' \
+  https://intel.example.com/api/v1/feeds/<feed id>/pull
+```
+
 ## Lookup
 
 ```bash
@@ -74,7 +96,7 @@ docker compose logs threat-intel | grep 'no owner yet'
 Open the link from the log once to create the owner account; there is no default password (ADR 0013). The UI and API
 are on http://localhost:8080, the API reference at http://localhost:8080/api/docs/.
 
-`openasy-kek` encrypts sign-in secrets in the database (ADR 0021). Keep it apart from the volume and with your backups.
+`openasy-kek` encrypts sign-in secrets and the passwords and tokens of pulled feeds in the database (ADR 0021). Keep it apart from the volume and with your backups.
 
 | Variable | Default | |
 | --- | --- | --- |
@@ -90,7 +112,8 @@ are on http://localhost:8080, the API reference at http://localhost:8080/api/doc
 | `THREAT_INTEL_PASSWORD_SIGN_IN`, `OPENASY_OIDC_*` | | Sign-in, as in every OpenAsy product ([@openasy/auth](https://github.com/openasy/auth)) |
 
 `/metrics` has `openasy_threat_intel_indicators{type}`, `openasy_threat_intel_feeds`, `openasy_threat_intel_allow_list`,
-`openasy_threat_intel_lookups_total` and `openasy_threat_intel_lookup_hits_total`.
+`openasy_threat_intel_lookups_total`, `openasy_threat_intel_lookup_hits_total` and
+`openasy_threat_intel_feed_pulls{state="ok|failing"}`.
 
 The container runs as non-root with a read-only root filesystem, no capabilities and `no-new-privileges`.
 

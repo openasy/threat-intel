@@ -28,7 +28,10 @@ let base: string;
 const covered = new Set<string>();
 
 beforeAll(async () => {
-  app = await startApp({ version, openapi: spec, docsDir });
+  // Feeds are pulled from here: one answers with a list, the other is down.
+  const pullFetch = (async (url: string | URL) =>
+    String(url).endsWith("/down") ? new Response("down", { status: 503 }) : new Response("198.51.100.50\n")) as typeof fetch;
+  app = await startApp({ version, openapi: spec, docsDir, pullFetch });
   base = app.base;
 });
 
@@ -143,6 +146,26 @@ describe("responses match openapi.json", () => {
     await call("POST", "/api/v1/feeds/{id}/import", auth(INGEST_TOKEN, body), `/api/v1/feeds/${manual}/import`);
     await call("POST", "/api/v1/feeds/{id}/import", auth(INGEST_TOKEN, body), "/api/v1/feeds/missing/import");
     await call("POST", "/api/v1/feeds/{id}/import", auth("wrong", body), `/api/v1/feeds/${stix}/import`);
+  });
+
+  it("pulls, and every refusal", async () => {
+    const text = idOf(await call("POST", "/api/v1/feeds", admin({ name: "Blocklist", kind: "text" })));
+    const at = `/api/v1/feeds/${text}/pull`;
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin({ url: "https://feeds.example.com/list.txt", everyMinutes: 60 }), at);
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin({ url: "https://feeds.example.com/list.txt", auth: "bearer", secret: "t0ken" }), at);
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin({ url: "nope" }), at);
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin("{"), at);
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin({ url: "https://feeds.example.com/x" }), `/api/v1/feeds/${manual}/pull`);
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin({ url: "https://feeds.example.com/x" }), "/api/v1/feeds/missing/pull");
+    await call("POST", "/api/v1/feeds/{id}/pull/run", admin(), `${at}/run`);
+    await call("GET", "/api/v1/feeds/{id}", admin(), `/api/v1/feeds/${text}`);
+    await call("PUT", "/api/v1/feeds/{id}/pull", admin({ url: "https://feeds.example.com/down" }), at);
+    await call("POST", "/api/v1/feeds/{id}/pull/run", admin(), `${at}/run`);
+    await call("GET", "/api/v1/feeds", admin());
+    await call("POST", "/api/v1/feeds/{id}/pull/run", admin(), `/api/v1/feeds/${manual}/pull/run`);
+    await call("DELETE", "/api/v1/feeds/{id}/pull", admin(), at);
+    await call("DELETE", "/api/v1/feeds/{id}/pull", admin(), at);
+    await call("DELETE", "/api/v1/feeds/{id}/pull", { method: "DELETE" }, at);
   });
 
   it("indicators", async () => {

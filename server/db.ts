@@ -51,6 +51,24 @@ const MIGRATIONS = [
      UNIQUE (type, value)
    );
    CREATE INDEX allow_value ON allow_list (type, value)`,
+  // Where a feed is pulled from on a schedule (ADR 0050): a TAXII 2.1 collection for a STIX feed, or a URL for any kind
+  // but manual. The password or token is sealed with openasy-kek. added_after is where the next TAXII pull starts.
+  `CREATE TABLE feed_pulls (
+     feed_id TEXT PRIMARY KEY REFERENCES feeds (id) ON DELETE CASCADE,
+     source TEXT NOT NULL CHECK (source IN ('taxii', 'url')),
+     url TEXT NOT NULL,
+     auth TEXT NOT NULL CHECK (auth IN ('none', 'basic', 'bearer')),
+     username TEXT,
+     secret TEXT,
+     every_minutes INTEGER NOT NULL,
+     added_after TEXT,
+     more INTEGER NOT NULL DEFAULT 0,
+     last_attempt_at TEXT,
+     last_success_at TEXT,
+     last_error TEXT,
+     last_result TEXT,
+     created_at TEXT NOT NULL
+   )`,
 ];
 
 /** Opens the product's single SQLite file in WAL mode (ADR 0011) and migrates it forward. */

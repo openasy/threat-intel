@@ -12,7 +12,7 @@ describe("openDb", () => {
     first.close();
 
     const second = openDb(path);
-    expect(second.prepare("SELECT COUNT(*) AS n FROM schema_migrations").get()).toEqual({ n: 1 });
+    expect(second.prepare("SELECT COUNT(*) AS n FROM schema_migrations").get()).toEqual({ n: 2 });
     second.close();
   });
 
@@ -25,7 +25,11 @@ describe("openDb", () => {
         "INSERT INTO indicators (id, type, value, feed_id, confidence, tlp, severity, valid_from, valid_until, created_at, updated_at) VALUES ('j', 'ipv4', '198.51.100.1', 'f', 50, 'amber', 'low', 'a', 'b', 'c', 'd')",
       ),
     ).toThrow(/UNIQUE/);
+    db.exec(
+      "INSERT INTO feed_pulls (feed_id, source, url, auth, every_minutes, created_at) VALUES ('f', 'url', 'https://feeds.example.com/list.txt', 'none', 60, 'now')",
+    );
     db.exec("DELETE FROM feeds");
     expect(db.prepare("SELECT COUNT(*) AS n FROM indicators").get()).toEqual({ n: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM feed_pulls").get()).toEqual({ n: 0 });
   });
 });
