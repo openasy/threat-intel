@@ -1,6 +1,6 @@
 {
   "name": "@openasy/threat-intel",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "OpenAsy Threat Intel: indicators from STIX, CSV and text feeds, one lookup for the other products, and an allow list with reasons.",
   "license": "AGPL-3.0-only",
