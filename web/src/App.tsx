@@ -74,7 +74,7 @@ import {
   type Verdict,
   type Overview,
 } from "./api.ts";
-import { useT, type T } from "./i18n.ts";
+import { useT, type T, viewerLocale, setViewerLocale } from "./i18n.ts";
 import { search } from "./search.ts";
 
 const PAGES = ["indicators", "feeds", "allow-list", "setup", "account", "members", "signin", "tokens", "about"] as const;
@@ -105,7 +105,7 @@ function useApi() {
   );
 }
 type Call = ReturnType<typeof useApi>;
-const date = (iso: string) => new Date(iso).toLocaleDateString();
+const date = (iso: string) => new Date(iso).toLocaleDateString(viewerLocale());
 const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
 
 const TYPE_LABEL = (t: T): Record<IndicatorType, string> => ({
@@ -166,11 +166,11 @@ function OverviewPage({ call, summary }: { call: Call; summary?: Summary }) {
   const [o, setO] = useState<Overview>();
   useEffect(() => void call<Overview>("/api/v1/overview").then(setO, () => {}), [call, summary]);
   const s = summary;
-  const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString(viewerLocale(), { month: "short", day: "numeric", timeZone: "UTC" });
   const feedColumns: Column<Overview["feeds"][number]>[] = [
     { id: "name", header: t("lookupPage.feed"), cell: (f) => <span className="font-medium">{f.name}</span> },
     { id: "kind", header: t("overviewPage.kind"), width: "110px", cell: (f) => <Badge>{KIND_LABEL(t)[f.kind as FeedKind] ?? f.kind}</Badge> },
-    { id: "active", header: t("lookupPage.activeIndicators"), width: "150px", align: "right", cell: (f) => f.active.toLocaleString() },
+    { id: "active", header: t("lookupPage.activeIndicators"), width: "150px", align: "right", cell: (f) => f.active.toLocaleString(viewerLocale()) },
     { id: "import", header: t("overviewPage.lastImport"), width: "130px", cell: (f) => <span className="text-xs">{ago(f.lastImportAt)}</span> },
     {
       id: "pull",
@@ -191,7 +191,7 @@ function OverviewPage({ call, summary }: { call: Call; summary?: Summary }) {
         <KpiGrid minWidth={150}>
           <KpiCard
             label={t("lookupPage.activeIndicators")}
-            value={s.indicators.active.toLocaleString()}
+            value={s.indicators.active.toLocaleString(viewerLocale())}
             icon={ListChecks}
             trend={o?.days.map((d) => d.added)}
             href="/indicators"
@@ -200,16 +200,16 @@ function OverviewPage({ call, summary }: { call: Call; summary?: Summary }) {
           <KpiCard label={t("overviewPage.failingPulls")} value={s.pulls.failing} icon={CircleX} tone={s.pulls.failing ? "danger" : "success"} href="/feeds" />
           <KpiCard
             label={t("overviewPage.endingSoon")}
-            value={o?.expiringSoon.toLocaleString() ?? "–"}
+            value={o?.expiringSoon.toLocaleString(viewerLocale()) ?? "–"}
             icon={Hourglass}
             tone={o?.expiringSoon ? "warning" : undefined}
           />
           <KpiCard label={t("lookupPage.allowedValues")} value={s.allowListed} icon={ShieldCheck} href="/allow-list" />
           <KpiCard
             label={t("lookupPage.lookups")}
-            value={s.lookups.total.toLocaleString()}
+            value={s.lookups.total.toLocaleString(viewerLocale())}
             icon={Search}
-            footer={t("lookupPage.matchedSinceTheLastStart", { value: s.lookups.hits.toLocaleString() })}
+            footer={t("lookupPage.matchedSinceTheLastStart", { value: s.lookups.hits.toLocaleString(viewerLocale()) })}
             href="/lookup"
           />
         </KpiGrid>
@@ -1032,7 +1032,8 @@ function FeedsPage({ call, reload }: { call: Call; reload: () => void }) {
       header: t("feedsPage.active"),
       align: "right",
       sortValue: (f) => f.indicators.active,
-      cell: (f) => t("feedsPage.activeOfTotal", { active: f.indicators.active.toLocaleString(), total: f.indicators.total.toLocaleString() }),
+      cell: (f) =>
+        t("feedsPage.activeOfTotal", { active: f.indicators.active.toLocaleString(viewerLocale()), total: f.indicators.total.toLocaleString(viewerLocale()) }),
     },
     {
       id: "defaults",
@@ -1497,6 +1498,7 @@ export function App() {
   const installBrand = useInstallBrand();
   const [theme] = useThemePreference();
   const [locale] = useLocalePreference();
+  setViewerLocale(locale);
   return (
     // The install's brand from config/brand.env (ADR 0053); OpenAsy's own look where it sets none.
     <BrandProvider theme={theme} locale={locale} brand={{ name: "OpenAsy", organization: undefined, ...installBrand }} className="min-h-screen">
